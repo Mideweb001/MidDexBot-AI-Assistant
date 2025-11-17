@@ -20,6 +20,7 @@ const HomeworkAssistant = require('./services/HomeworkAssistant');
 const EventManager = require('./services/EventManager');
 const CourseService = require('./services/CourseService');
 const FoodOrderService = require('./services/FoodOrderService');
+const BusinessService = require('./services/BusinessService');
 
 class TelegramDocumentBot {
   constructor() {
@@ -751,6 +752,40 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     this.bot.onText(/\/myorders/, async (msg) => {
       const chatId = msg.chat.id;
       await this.showMyOrders(chatId);
+    });
+
+    // Business Marketplace commands
+    this.bot.onText(/\/register_business/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.startBusinessRegistration(chatId);
+    });
+
+    this.bot.onText(/\/search(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const query = match && match[1] ? match[1].trim() : null;
+      await this.searchBusinesses(chatId, query);
+    });
+
+    this.bot.onText(/\/order(?:\s+(\d+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const businessId = match && match[1] ? parseInt(match[1]) : null;
+      await this.startOrdering(chatId, businessId);
+    });
+
+    this.bot.onText(/\/review(?:\s+(\d+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const orderId = match && match[1] ? parseInt(match[1]) : null;
+      await this.reviewOrder(chatId, orderId);
+    });
+
+    this.bot.onText(/\/my_orders/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showUserOrders(chatId);
+    });
+
+    this.bot.onText(/\/my_business/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showMyBusinesses(chatId);
     });
 
     // Document handler
@@ -4900,7 +4935,12 @@ Send documents, ask questions, or use commands to get started!
     let message = `🏠 *Main Menu*\n\n`;
     message += `Hello ${firstName}! 👋\n\n`;
     message += `🤖 *Your AI Study & Document Assistant*\n\n`;
-    message += `🍽️ **Food Delivery & Ordering** 🎯\n`;
+    message += `� **Business Marketplace** 🆕\n`;
+    message += `• **Search** - Find local businesses\n`;
+    message += `• **Order** - Shop from businesses\n`;
+    message += `• **Register** - List your business\n`;
+    message += `• **My Orders** - Track marketplace orders\n\n`;
+    message += `�🍽️ **Food Delivery & Ordering** 🎯\n`;
     message += `• **Food Hub** - Your ordering dashboard\n`;
     message += `• **My Orders** - Track all your orders\n`;
     message += `• **Restaurants** - Browse nearby options\n\n`;
@@ -4916,7 +4956,7 @@ Send documents, ask questions, or use commands to get started!
     message += `• Portfolio Tracking\n\n`;
     message += `👥 **Collaboration**\n`;
     message += `• Study Groups & Communities\n\n`;
-    message += `⚡ **Quick Commands:** /food, /orders, /restaurants, /help`;
+    message += `⚡ **Quick Commands:** /search, /register_business, /my_orders, /help`;
 
     await this.bot.sendMessage(chatId, message, {
       parse_mode: 'Markdown',
@@ -4974,6 +5014,13 @@ Send documents, ask questions, or use commands to get started!
     message += `/register_restaurant or /registerrestaurant - Register your restaurant\n`;
     message += `/manage_restaurant or /managerestaurant - Manage your restaurant\n`;
     message += `/my_orders or /myorders - View your food orders\n\n`;
+    message += `🏪 *Business Marketplace Commands* 🆕\n`;
+    message += `/register_business - Register your business\n`;
+    message += `/search [keyword] - Search for businesses\n`;
+    message += `/order [business_id] - Order from a business\n`;
+    message += `/review [order_id] - Review your order\n`;
+    message += `/my_orders - View marketplace orders\n`;
+    message += `/my_business - Manage your businesses\n\n`;
     message += `🔧 *System Commands*\n`;
     message += `/debug - View system status and diagnostics\n`;
     message += `/menu - Show main menu\n`;
@@ -6564,6 +6611,366 @@ Send documents, ask questions, or use commands to get started!
       console.error('Error handling location:', error);
       await this.bot.sendMessage(chatId, '❌ Error processing location. Please try again.');
     }
+  }
+
+  // Business Marketplace Methods
+  async startBusinessRegistration(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      const message = `🏢 *Business Registration*\n\n` +
+        `Welcome to the business marketplace! Let's get your business registered.\n\n` +
+        `Please provide your business name:`;
+
+      await this.bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+      
+      // Set conversation state for business registration
+      await this.conversationManager.setUserData(chatId, 'registrationFlow', 'business_name');
+      await this.conversationManager.setUserData(chatId, 'businessData', {});
+    } catch (error) {
+      console.error('Error starting business registration:', error);
+      await this.bot.sendMessage(chatId, '❌ Error starting registration. Please try again.');
+    }
+  }
+
+  async searchBusinesses(chatId, query) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      // Get user's location if available
+      const userData = await this.conversationManager.getUserData(chatId, 'userLocation');
+      const userLat = userData?.latitude;
+      const userLng = userData?.longitude;
+
+      if (!query && !userLat) {
+        // Show search options
+        const message = `🔍 *Search Businesses*\n\n` +
+          `Choose a search method:\n\n` +
+          `📍 Share your location to find nearby businesses\n` +
+          `🏷️ Browse by category\n` +
+          `🔤 Search by keyword`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '📍 Share Location', callback_data: 'share_location' }],
+            [{ text: '🏷️ Browse Categories', callback_data: 'browse_categories' }],
+            [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+        return;
+      }
+
+      await this.bot.sendMessage(chatId, '🔍 Searching for businesses...');
+
+      const result = await BusinessService.searchBusinesses(query, userLat, userLng);
+
+      if (!result.success || result.businesses.length === 0) {
+        await this.bot.sendMessage(chatId, 
+          '❌ No businesses found. Try a different search term or location.',
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🔙 Back to Search', callback_data: 'search_menu' }]]
+            }
+          }
+        );
+        return;
+      }
+
+      const message = BusinessService.formatBusinessList(result.businesses, userLat, userLng);
+
+      // Create buttons for each business
+      const keyboard = { inline_keyboard: [] };
+      result.businesses.slice(0, 10).forEach(business => {
+        keyboard.inline_keyboard.push([
+          { text: `🔍 View ${business.business_name}`, callback_data: `view_business_${business.id}` },
+          { text: `🛒 Order`, callback_data: `order_business_${business.id}` }
+        ]);
+      });
+      
+      keyboard.inline_keyboard.push([{ text: '🏠 Main Menu', callback_data: 'main_menu' }]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error searching businesses:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching businesses. Please try again.');
+    }
+  }
+
+  async startOrdering(chatId, businessId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      if (!businessId) {
+        await this.bot.sendMessage(chatId, 
+          '📝 Usage: /order <business_id>\n\nFirst, search for businesses using /search'
+        );
+        return;
+      }
+
+      const result = await BusinessService.getBusinessDetails(businessId);
+
+      if (!result.success) {
+        await this.bot.sendMessage(chatId, '❌ Business not found.');
+        return;
+      }
+
+      const business = result.business;
+      const message = business.getFormattedInfo() + '\n\n' +
+        BusinessService.formatMenu(business.menu_items);
+
+      // Create order buttons
+      const keyboard = { inline_keyboard: [] };
+      
+      if (business.menu_items && business.menu_items.length > 0) {
+        business.menu_items.slice(0, 8).forEach(item => {
+          if (item.available) {
+            keyboard.inline_keyboard.push([
+              { text: `➕ ${item.name} - $${parseFloat(item.price).toFixed(2)}`, 
+                callback_data: `add_item_${businessId}_${item.name}` }
+            ]);
+          }
+        });
+      }
+
+      keyboard.inline_keyboard.push(
+        [{ text: '🛒 View Cart', callback_data: `view_cart_${businessId}` }],
+        [{ text: '✅ Complete Order', callback_data: `complete_order_${businessId}` }],
+        [{ text: '🔙 Back to Search', callback_data: 'search_menu' }]
+      );
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+      // Initialize empty cart
+      await this.conversationManager.setUserData(chatId, 'orderCart', {
+        businessId,
+        items: []
+      });
+    } catch (error) {
+      console.error('Error starting order:', error);
+      await this.bot.sendMessage(chatId, '❌ Error starting order. Please try again.');
+    }
+  }
+
+  async reviewOrder(chatId, orderId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      if (!orderId) {
+        // Show list of completed orders
+        const result = await BusinessService.getCustomerOrders(user.id);
+        
+        if (!result.success || result.orders.length === 0) {
+          await this.bot.sendMessage(chatId, '❌ No orders found to review.');
+          return;
+        }
+
+        const reviewableOrders = result.orders.filter(order => 
+          order.status === 'delivered' && !order.rating
+        );
+
+        if (reviewableOrders.length === 0) {
+          await this.bot.sendMessage(chatId, '❌ No orders available for review.');
+          return;
+        }
+
+        let message = '⭐ *Select an order to review:*\n\n';
+        const keyboard = { inline_keyboard: [] };
+
+        reviewableOrders.forEach(order => {
+          message += `📦 Order ${order.order_number} - $${parseFloat(order.total_amount).toFixed(2)}\n`;
+          keyboard.inline_keyboard.push([
+            { text: `Review ${order.order_number}`, callback_data: `review_order_${order.id}` }
+          ]);
+        });
+
+        keyboard.inline_keyboard.push([{ text: '🏠 Main Menu', callback_data: 'main_menu' }]);
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      } else {
+        // Show rating options for specific order
+        const message = `⭐ *Rate Your Experience*\n\nHow would you rate this order?`;
+        
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: '⭐', callback_data: `rate_${orderId}_1` },
+              { text: '⭐⭐', callback_data: `rate_${orderId}_2` },
+              { text: '⭐⭐⭐', callback_data: `rate_${orderId}_3` }
+            ],
+            [
+              { text: '⭐⭐⭐⭐', callback_data: `rate_${orderId}_4` },
+              { text: '⭐⭐⭐⭐⭐', callback_data: `rate_${orderId}_5` }
+            ],
+            [{ text: '🔙 Cancel', callback_data: 'my_orders' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+    } catch (error) {
+      console.error('Error reviewing order:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading reviews. Please try again.');
+    }
+  }
+
+  async showUserOrders(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      const result = await BusinessService.getCustomerOrders(user.id, 15);
+
+      if (!result.success || result.orders.length === 0) {
+        await this.bot.sendMessage(chatId, 
+          '📦 You haven\'t placed any orders yet.\n\nUse /search to find businesses and place your first order!',
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🔍 Search Businesses', callback_data: 'search_menu' }]]
+            }
+          }
+        );
+        return;
+      }
+
+      let message = `📦 *Your Orders* (${result.count} total)\n\n`;
+
+      result.orders.forEach((order, index) => {
+        const statusEmoji = this.getOrderStatusEmoji(order.status);
+        message += `${index + 1}. ${statusEmoji} Order ${order.order_number}\n`;
+        message += `   💰 $${parseFloat(order.total_amount).toFixed(2)} • ${order.status}\n`;
+        message += `   📅 ${new Date(order.created_at).toLocaleDateString()}\n\n`;
+      });
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '🔍 Track Order', callback_data: 'track_order' }],
+          [{ text: '🔍 Search More', callback_data: 'search_menu' }],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing user orders:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading orders. Please try again.');
+    }
+  }
+
+  async showMyBusinesses(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      if (!user) {
+        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        return;
+      }
+
+      const { Business } = require('./models');
+      const businesses = await Business.findAll({
+        where: { owner_id: user.id },
+        raw: true
+      });
+
+      if (businesses.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '🏢 You haven\'t registered any businesses yet.\n\nUse /register_business to get started!',
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🏢 Register Business', callback_data: 'start_business_reg' }]]
+            }
+          }
+        );
+        return;
+      }
+
+      let message = `🏢 *Your Businesses* (${businesses.length})\n\n`;
+
+      businesses.forEach((business, index) => {
+        message += `${index + 1}. *${business.business_name}*\n`;
+        message += `   📂 ${business.category}\n`;
+        message += `   ⭐ ${business.rating ? business.rating.toFixed(1) : 'No rating'}\n`;
+        message += `   ${business.is_active ? '🟢 Active' : '🔴 Inactive'}\n`;
+        message += `   ID: \`${business.id}\`\n\n`;
+      });
+
+      const keyboard = { inline_keyboard: [] };
+      businesses.forEach(business => {
+        keyboard.inline_keyboard.push([
+          { text: `📊 Manage ${business.business_name}`, callback_data: `manage_business_${business.id}` }
+        ]);
+      });
+      
+      keyboard.inline_keyboard.push(
+        [{ text: '➕ Register Another Business', callback_data: 'start_business_reg' }],
+        [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+      );
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing businesses:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading businesses. Please try again.');
+    }
+  }
+
+  getOrderStatusEmoji(status) {
+    const emojiMap = {
+      'pending': '🕐',
+      'confirmed': '✅',
+      'preparing': '👨‍🍳',
+      'ready': '✨',
+      'out_for_delivery': '🚚',
+      'delivered': '🎉',
+      'cancelled': '❌',
+      'rejected': '🚫'
+    };
+    return emojiMap[status] || '📦';
   }
 }
 
