@@ -9,8 +9,10 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: false,
       // FK handled via association; removed explicit reference to avoid case issues
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     },
     conversation_type: {
       type: DataTypes.ENUM('document_analysis', 'study_session', 'research', 'homework_help', 'general'),
@@ -26,8 +28,10 @@ module.exports = (sequelize) => {
     },
     last_document_id: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: true,
       // Association-based FK; removed explicit reference (documents)
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     },
     session_data: {
       type: DataTypes.JSON,

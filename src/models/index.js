@@ -56,110 +56,114 @@ const MenuItem = require('./MenuItem')(sequelize);
 const FoodOrder = require('./FoodOrder')(sequelize);
 const OrderItem = require('./OrderItem')(sequelize);
 
-// Define associations
-User.hasMany(Document, { foreignKey: 'user_id', as: 'documents' });
-Document.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+// Define associations (constraints: false to prevent automatic FK references)
+User.hasMany(Document, { foreignKey: 'user_id', as: 'documents', constraints: false });
+Document.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(Conversation, { foreignKey: 'user_id', as: 'conversations' });
-Conversation.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Conversation, { foreignKey: 'user_id', as: 'conversations', constraints: false });
+Conversation.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(ProcessedImage, { foreignKey: 'user_id', as: 'processedImages' });
-ProcessedImage.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(ProcessedImage, { foreignKey: 'user_id', as: 'processedImages', constraints: false });
+ProcessedImage.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(StudySession, { foreignKey: 'user_id', as: 'studySessions' });
-StudySession.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(StudySession, { foreignKey: 'user_id', as: 'studySessions', constraints: false });
+StudySession.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(CryptoAlert, { foreignKey: 'user_id', as: 'cryptoAlerts' });
-CryptoAlert.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(CryptoAlert, { foreignKey: 'user_id', as: 'cryptoAlerts', constraints: false });
+CryptoAlert.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(UserCryptoWatchlist, { foreignKey: 'user_id', as: 'cryptoWatchlist' });
-UserCryptoWatchlist.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(UserCryptoWatchlist, { foreignKey: 'user_id', as: 'cryptoWatchlist', constraints: false });
+UserCryptoWatchlist.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-User.hasMany(CryptoInventory, { foreignKey: 'user_id', as: 'cryptoInventory' });
-CryptoInventory.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(CryptoInventory, { foreignKey: 'user_id', as: 'cryptoInventory', constraints: false });
+CryptoInventory.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
 // Study Group associations
-User.hasMany(StudyGroup, { foreignKey: 'creator_id', as: 'createdStudyGroups' });
-StudyGroup.belongsTo(User, { foreignKey: 'creator_id', as: 'creator' });
+User.hasMany(StudyGroup, { foreignKey: 'creator_id', as: 'createdStudyGroups', constraints: false });
+StudyGroup.belongsTo(User, { foreignKey: 'creator_id', as: 'creator', constraints: false });
 
-StudyGroup.hasMany(StudyGroupMember, { foreignKey: 'study_group_id', as: 'members' });
-StudyGroupMember.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup' });
+StudyGroup.hasMany(StudyGroupMember, { foreignKey: 'study_group_id', as: 'members', constraints: false });
+StudyGroupMember.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup', constraints: false });
 
-User.hasMany(StudyGroupMember, { foreignKey: 'user_id', as: 'studyGroupMemberships' });
-StudyGroupMember.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(StudyGroupMember, { foreignKey: 'user_id', as: 'studyGroupMemberships', constraints: false });
+StudyGroupMember.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
 // Many-to-many through StudyGroupMember
 User.belongsToMany(StudyGroup, { 
   through: StudyGroupMember, 
   foreignKey: 'user_id',
   otherKey: 'study_group_id',
-  as: 'joinedStudyGroups'
+  as: 'joinedStudyGroups',
+  constraints: false
 });
 StudyGroup.belongsToMany(User, { 
   through: StudyGroupMember, 
   foreignKey: 'study_group_id',
   otherKey: 'user_id',
-  as: 'groupMembers'
+  as: 'groupMembers',
+  constraints: false
 });
 
 // Homework associations
-User.hasMany(HomeworkSession, { foreignKey: 'user_id', as: 'homeworkSessions' });
-HomeworkSession.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(HomeworkSession, { foreignKey: 'user_id', as: 'homeworkSessions', constraints: false });
+HomeworkSession.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-StudyGroup.hasMany(HomeworkSession, { foreignKey: 'study_group_id', as: 'sharedHomework' });
-HomeworkSession.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup' });
+StudyGroup.hasMany(HomeworkSession, { foreignKey: 'study_group_id', as: 'sharedHomework', constraints: false });
+HomeworkSession.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup', constraints: false });
 
 // Event associations
-User.hasMany(Event, { foreignKey: 'user_id', as: 'events' });
-Event.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Event, { foreignKey: 'user_id', as: 'events', constraints: false });
+Event.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
-StudyGroup.hasMany(Event, { foreignKey: 'study_group_id', as: 'groupEvents' });
-Event.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup' });
+StudyGroup.hasMany(Event, { foreignKey: 'study_group_id', as: 'groupEvents', constraints: false });
+Event.belongsTo(StudyGroup, { foreignKey: 'study_group_id', as: 'studyGroup', constraints: false });
 
 // Self-referencing for recurring events
-Event.hasMany(Event, { foreignKey: 'parent_event_id', as: 'childEvents' });
-Event.belongsTo(Event, { foreignKey: 'parent_event_id', as: 'parentEvent' });
+Event.hasMany(Event, { foreignKey: 'parent_event_id', as: 'childEvents', constraints: false });
+Event.belongsTo(Event, { foreignKey: 'parent_event_id', as: 'parentEvent', constraints: false });
 
 // Course associations
-Course.hasMany(UserCourse, { foreignKey: 'course_id', as: 'enrollments' });
-UserCourse.belongsTo(Course, { foreignKey: 'course_id', as: 'course' });
+Course.hasMany(UserCourse, { foreignKey: 'course_id', as: 'enrollments', constraints: false });
+UserCourse.belongsTo(Course, { foreignKey: 'course_id', as: 'course', constraints: false });
 
-User.hasMany(UserCourse, { foreignKey: 'user_id', as: 'courseEnrollments' });
-UserCourse.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(UserCourse, { foreignKey: 'user_id', as: 'courseEnrollments', constraints: false });
+UserCourse.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
 // Many-to-many through UserCourse
 User.belongsToMany(Course, { 
   through: UserCourse, 
   foreignKey: 'user_id',
   otherKey: 'course_id',
-  as: 'enrolledCourses'
+  as: 'enrolledCourses',
+  constraints: false
 });
 Course.belongsToMany(User, { 
   through: UserCourse, 
   foreignKey: 'course_id',
   otherKey: 'user_id',
-  as: 'enrolledUsers'
+  as: 'enrolledUsers',
+  constraints: false
 });
 
 // Restaurant associations
-User.hasMany(Restaurant, { foreignKey: 'owner_id', as: 'ownedRestaurants' });
-Restaurant.belongsTo(User, { foreignKey: 'owner_id', as: 'owner' });
+User.hasMany(Restaurant, { foreignKey: 'owner_id', as: 'ownedRestaurants', constraints: false });
+Restaurant.belongsTo(User, { foreignKey: 'owner_id', as: 'owner', constraints: false });
 
-Restaurant.hasMany(MenuItem, { foreignKey: 'restaurant_id', as: 'menuItems' });
-MenuItem.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant' });
+Restaurant.hasMany(MenuItem, { foreignKey: 'restaurant_id', as: 'menuItems', constraints: false });
+MenuItem.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant', constraints: false });
 
 // Food Order associations
-User.hasMany(FoodOrder, { foreignKey: 'customer_id', as: 'foodOrders' });
-FoodOrder.belongsTo(User, { foreignKey: 'customer_id', as: 'customer' });
+User.hasMany(FoodOrder, { foreignKey: 'customer_id', as: 'foodOrders', constraints: false });
+FoodOrder.belongsTo(User, { foreignKey: 'customer_id', as: 'customer', constraints: false });
 
-Restaurant.hasMany(FoodOrder, { foreignKey: 'restaurant_id', as: 'orders' });
-FoodOrder.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant' });
+Restaurant.hasMany(FoodOrder, { foreignKey: 'restaurant_id', as: 'orders', constraints: false });
+FoodOrder.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant', constraints: false });
 
-FoodOrder.hasMany(OrderItem, { foreignKey: 'order_id', as: 'items' });
-OrderItem.belongsTo(FoodOrder, { foreignKey: 'order_id', as: 'order' });
+FoodOrder.hasMany(OrderItem, { foreignKey: 'order_id', as: 'items', constraints: false });
+OrderItem.belongsTo(FoodOrder, { foreignKey: 'order_id', as: 'order', constraints: false });
 
-MenuItem.hasMany(OrderItem, { foreignKey: 'menu_item_id', as: 'orderItems' });
-OrderItem.belongsTo(MenuItem, { foreignKey: 'menu_item_id', as: 'menuItem' });
+MenuItem.hasMany(OrderItem, { foreignKey: 'menu_item_id', as: 'orderItems', constraints: false });
+OrderItem.belongsTo(MenuItem, { foreignKey: 'menu_item_id', as: 'menuItem', constraints: false });
 
 module.exports = {
   sequelize,
