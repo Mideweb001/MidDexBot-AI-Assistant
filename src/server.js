@@ -3184,8 +3184,14 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
 
   async start() {
     try {
-      // Initialize database first
-      await this.databaseService.initialize();
+      // Try to initialize database, but continue if it fails
+      try {
+        await this.databaseService.initialize();
+        console.log('✅ Database ready for use');
+      } catch (dbError) {
+        console.warn('⚠️ Database initialization failed, continuing without persistence:', dbError.message);
+        // Continue without database - bot will work but won't save data
+      }
       
       // Start crypto alert monitoring
       console.log('🚀 Starting crypto alert monitoring...');
