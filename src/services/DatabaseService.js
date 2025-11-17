@@ -18,16 +18,17 @@ class DatabaseService {
 
       // Sync all models (create tables if they don't exist)
       if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-        // Production PostgreSQL: Force sync to recreate tables with proper naming
-        console.log('🏭 Production mode: Force syncing PostgreSQL tables...');
+        // Production PostgreSQL: Use alter to avoid data loss and adjust schemas safely
+        console.log('🏭 Production mode: Alter syncing PostgreSQL tables...');
         await this.sequelize.sync({ 
-          force: true // This will drop and recreate tables
+          alter: true,
+          force: false
         });
-        console.log('✅ Production database tables created');
+        console.log('✅ Production database tables synchronized');
       } else {
         // Development SQLite: Use alter for schema changes
         await this.sequelize.sync({ 
-          alter: process.env.NODE_ENV === 'development',
+          alter: true,
           force: false
         });
         console.log('✅ Database models synchronized');

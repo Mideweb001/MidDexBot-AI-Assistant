@@ -56,6 +56,10 @@ const MenuItem = require('./MenuItem')(sequelize);
 const FoodOrder = require('./FoodOrder')(sequelize);
 const OrderItem = require('./OrderItem')(sequelize);
 
+// Business marketplace models
+const Business = require('./Business')(sequelize);
+const Order = require('./Order')(sequelize);
+
 // Define associations (constraints: false to prevent automatic FK references)
 User.hasMany(Document, { foreignKey: 'user_id', as: 'documents', constraints: false });
 Document.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
@@ -165,6 +169,16 @@ OrderItem.belongsTo(FoodOrder, { foreignKey: 'order_id', as: 'order', constraint
 MenuItem.hasMany(OrderItem, { foreignKey: 'menu_item_id', as: 'orderItems', constraints: false });
 OrderItem.belongsTo(MenuItem, { foreignKey: 'menu_item_id', as: 'menuItem', constraints: false });
 
+// Business marketplace associations
+User.hasMany(Business, { foreignKey: 'owner_id', as: 'businesses', constraints: false });
+Business.belongsTo(User, { foreignKey: 'owner_id', as: 'owner', constraints: false });
+
+User.hasMany(Order, { foreignKey: 'customer_id', as: 'orders', constraints: false });
+Order.belongsTo(User, { foreignKey: 'customer_id', as: 'customer', constraints: false });
+
+Business.hasMany(Order, { foreignKey: 'business_id', as: 'businessOrders', constraints: false });
+Order.belongsTo(Business, { foreignKey: 'business_id', as: 'business', constraints: false });
+
 module.exports = {
   sequelize,
   User,
@@ -184,5 +198,7 @@ module.exports = {
   Restaurant,
   MenuItem,
   FoodOrder,
-  OrderItem
+  OrderItem,
+  Business,
+  Order
 };
