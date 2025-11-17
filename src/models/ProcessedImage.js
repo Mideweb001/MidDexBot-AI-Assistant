@@ -9,11 +9,8 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'Users',
-        key: 'id'
-      }
+      allowNull: false
+      // Association-based FK; removed explicit reference (users)
     },
     telegram_file_id: {
       type: DataTypes.STRING,
@@ -56,6 +53,7 @@ module.exports = (sequelize) => {
       defaultValue: {}
     }
   }, {
+    tableName: 'processed_images',
     indexes: [
       {
         fields: ['user_id', 'created_at']

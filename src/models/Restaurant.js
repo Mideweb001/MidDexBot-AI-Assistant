@@ -8,12 +8,9 @@ module.exports = (sequelize) => {
     autoIncrement: true
   },
   owner_id: {
-    type: DataTypes.BIGINT,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id'
-    }
+    type: DataTypes.INTEGER,
+    allowNull: false
+    // Association-based FK; explicit reference removed to avoid type/case issues on Postgres
   },
   name: {
     type: DataTypes.STRING(255),

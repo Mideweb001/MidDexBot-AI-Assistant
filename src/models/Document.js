@@ -9,11 +9,8 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'Users',
-        key: 'id'
-      }
+      allowNull: false
+      // FK enforced via association in models/index.js; explicit references removed to avoid casing issues on Postgres
     },
     telegram_file_id: {
       type: DataTypes.STRING,

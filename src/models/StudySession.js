@@ -9,11 +9,8 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'Users',
-        key: 'id'
-      }
+      allowNull: false
+      // Association-based FK; removed explicit reference (users)
     },
     session_type: {
       type: DataTypes.ENUM('research', 'notes', 'homework', 'study_plan', 'timer'),
@@ -60,6 +57,7 @@ module.exports = (sequelize) => {
       allowNull: true
     }
   }, {
+    tableName: 'study_sessions',
     indexes: [
       {
         fields: ['user_id', 'session_type']

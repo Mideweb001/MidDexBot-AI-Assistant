@@ -8,12 +8,9 @@ module.exports = (sequelize) => {
             autoIncrement: true
         },
         user_id: {
-            type: DataTypes.BIGINT,
-            allowNull: false,
-            references: {
-                model: 'Users',
-                key: 'id'
-            }
+            type: DataTypes.INTEGER,
+            allowNull: false
+            // Association-based FK; explicit reference removed to avoid case issues on Postgres
         },
         coin_id: {
             type: DataTypes.STRING,

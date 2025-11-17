@@ -9,11 +9,8 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'Users',
-        key: 'id'
-      }
+      allowNull: false
+      // FK handled via association; removed explicit reference to avoid case issues
     },
     conversation_type: {
       type: DataTypes.ENUM('document_analysis', 'study_session', 'research', 'homework_help', 'general'),
@@ -29,11 +26,8 @@ module.exports = (sequelize) => {
     },
     last_document_id: {
       type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Documents',
-        key: 'id'
-      }
+      allowNull: true
+      // Association-based FK; removed explicit reference (documents)
     },
     session_data: {
       type: DataTypes.JSON,
@@ -44,6 +38,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    tableName: 'conversations',
     indexes: [
       {
         fields: ['user_id', 'is_active']

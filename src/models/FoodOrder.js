@@ -13,12 +13,9 @@ module.exports = (sequelize) => {
     allowNull: false
   },
   customer_id: {
-    type: DataTypes.BIGINT,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id'
-    }
+    type: DataTypes.INTEGER,
+    allowNull: false
+    // Association-based FK; explicit reference removed to avoid type/case issues on Postgres
   },
   restaurant_id: {
     type: DataTypes.INTEGER,

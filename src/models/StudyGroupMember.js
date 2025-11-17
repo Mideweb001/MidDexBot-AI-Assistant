@@ -18,12 +18,9 @@ module.exports = (sequelize) => {
       onUpdate: 'CASCADE'
     },
     user_id: {
-      type: DataTypes.BIGINT,
+      type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: 'Users',
-        key: 'id'
-      },
+      // Association-based FK; explicit reference removed to avoid case issues on Postgres
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
     },
