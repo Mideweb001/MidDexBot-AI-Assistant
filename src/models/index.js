@@ -17,6 +17,7 @@ if (process.env.DATABASE_URL) {
     define: {
       timestamps: true,
       underscored: true,
+      freezeTableName: true
     }
   });
 } else {

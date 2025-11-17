@@ -4,12 +4,13 @@
   "description": "Telegram bot with AI-powered document processing and analysis capabilities",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "npm run db:init && node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
     "build": "npm install",
     "lint": "eslint src/",
-    "deploy": "node deploy.js"
+    "deploy": "node deploy.js",
+    "db:init": "node scripts/init-postgres.js"
   },
   "keywords": [
     "telegram",

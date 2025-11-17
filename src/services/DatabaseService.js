@@ -16,11 +16,19 @@ class DatabaseService {
       await this.sequelize.authenticate();
       console.log('✅ Database connection established successfully');
 
-      // Sync all models (create tables if they don't exist)
-      await this.sequelize.sync({ 
-        alter: process.env.NODE_ENV === 'development' 
-      });
-      console.log('✅ Database models synchronized');
+      // Skip sync in production if DATABASE_URL is set - tables should be pre-initialized
+      if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+        console.log('🏭 Production mode: Skipping sync (tables pre-initialized)');
+      } else {
+        // Sync all models (create tables if they don't exist)
+        // Use force: false to avoid dropping existing tables
+        // Use alter: true only in development for schema changes
+        await this.sequelize.sync({ 
+          alter: process.env.NODE_ENV === 'development',
+          force: false
+        });
+        console.log('✅ Database models synchronized');
+      }
 
       return true;
     } catch (error) {
