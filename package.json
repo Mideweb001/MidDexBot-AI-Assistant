@@ -4,7 +4,7 @@
   "description": "Telegram bot with AI-powered document processing and analysis capabilities",
   "main": "src/server.js",
   "scripts": {
-    "start": "npm run db:init && node src/server.js",
+    "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
     "build": "npm install",
