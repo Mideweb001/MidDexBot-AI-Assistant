@@ -47,6 +47,7 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.NOW
     }
   }, {
+    tableName: 'users',
     indexes: [
       {
         unique: true,

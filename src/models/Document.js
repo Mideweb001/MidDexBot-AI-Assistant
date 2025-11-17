@@ -64,6 +64,7 @@ module.exports = (sequelize) => {
       allowNull: true
     }
   }, {
+    tableName: 'documents',
     indexes: [
       {
         fields: ['user_id', 'created_at']

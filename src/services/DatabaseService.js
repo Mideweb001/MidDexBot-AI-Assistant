@@ -16,13 +16,16 @@ class DatabaseService {
       await this.sequelize.authenticate();
       console.log('✅ Database connection established successfully');
 
-      // Skip sync in production if DATABASE_URL is set - tables should be pre-initialized
+      // Sync all models (create tables if they don't exist)
       if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-        console.log('🏭 Production mode: Skipping sync (tables pre-initialized)');
+        // Production PostgreSQL: Force sync to recreate tables with proper naming
+        console.log('🏭 Production mode: Force syncing PostgreSQL tables...');
+        await this.sequelize.sync({ 
+          force: true // This will drop and recreate tables
+        });
+        console.log('✅ Production database tables created');
       } else {
-        // Sync all models (create tables if they don't exist)
-        // Use force: false to avoid dropping existing tables
-        // Use alter: true only in development for schema changes
+        // Development SQLite: Use alter for schema changes
         await this.sequelize.sync({ 
           alter: process.env.NODE_ENV === 'development',
           force: false
