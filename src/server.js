@@ -19,6 +19,7 @@ const StudyGroupService = require('./services/StudyGroupService');
 const HomeworkAssistant = require('./services/HomeworkAssistant');
 const EventManager = require('./services/EventManager');
 const CourseService = require('./services/CourseService');
+const FoodOrderService = require('./services/FoodOrderService');
 
 class TelegramDocumentBot {
   constructor() {
@@ -665,6 +666,30 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showMyCoursesMenu(chatId);
     });
 
+    // Restaurant registration command
+    this.bot.onText(/\/register_restaurant/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.startRestaurantRegistration(chatId);
+    });
+
+    // Food ordering command
+    this.bot.onText(/\/order_food/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.startFoodOrdering(chatId);
+    });
+
+    // Restaurant management command
+    this.bot.onText(/\/manage_restaurant/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showRestaurantManagement(chatId);
+    });
+
+    // My orders command
+    this.bot.onText(/\/my_orders/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showMyOrders(chatId);
+    });
+
     // Document handler
     this.bot.on('document', async (msg) => {
       await this.handleDocument(msg);
@@ -675,9 +700,14 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.handlePhoto(msg);
     });
 
+    // Location handler
+    this.bot.on('location', async (msg) => {
+      await this.handleLocation(msg);
+    });
+
     // Text message handler
     this.bot.on('message', async (msg) => {
-      if (!msg.document && !msg.photo && msg.text && !msg.text.startsWith('/')) {
+      if (!msg.document && !msg.photo && !msg.location && msg.text && !msg.text.startsWith('/')) {
         await this.handleTextMessage(msg);
       }
     });
@@ -887,6 +917,16 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     
     if (text.includes('skills & courses') || text.includes('skills and courses')) {
       await this.showSkillsCoursesMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('food ordering')) {
+      await this.startFoodOrdering(chatId);
+      return;
+    }
+    
+    if (text.includes('restaurant hub')) {
+      await this.showRestaurantHub(chatId);
       return;
     }
     
@@ -1397,6 +1437,35 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         } else if (data === 'main_menu') {
           await this.showMainMenu(chatId);
         }
+        
+        // Food ordering dynamic callbacks
+        if (data.startsWith('restaurant_menu_')) {
+          const restaurantId = parseInt(data.replace('restaurant_menu_', ''));
+          await this.showRestaurantMenu(chatId, restaurantId);
+        } else if (data.startsWith('toggle_restaurant_')) {
+          const restaurantId = parseInt(data.replace('toggle_restaurant_', ''));
+          await this.toggleRestaurantStatus(chatId, restaurantId);
+        } else if (data.startsWith('manage_menu_')) {
+          const restaurantId = parseInt(data.replace('manage_menu_', ''));
+          await this.showMenuManagement(chatId, restaurantId);
+        } else if (data.startsWith('restaurant_orders_')) {
+          const restaurantId = parseInt(data.replace('restaurant_orders_', ''));
+          await this.showRestaurantOrders(chatId, restaurantId);
+        } else if (data.startsWith('restaurant_analytics_')) {
+          const restaurantId = parseInt(data.replace('restaurant_analytics_', ''));
+          await this.showRestaurantAnalytics(chatId, restaurantId);
+        } else if (data.startsWith('restaurant_settings_')) {
+          const restaurantId = parseInt(data.replace('restaurant_settings_', ''));
+          await this.showRestaurantSettings(chatId, restaurantId);
+        } else if (data.startsWith('menu_category_')) {
+          const parts = data.replace('menu_category_', '').split('_');
+          const restaurantId = parseInt(parts[0]);
+          const category = parts.slice(1).join('_');
+          await this.showMenuCategory(chatId, restaurantId, category);
+        } else if (data.startsWith('view_cart_')) {
+          const restaurantId = parseInt(data.replace('view_cart_', ''));
+          await this.showCart(chatId, restaurantId);
+        }
         break;
 
       // === STUDY GROUP CALLBACK HANDLERS ===
@@ -1500,6 +1569,44 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       case 'priority_medium':
       case 'priority_low':
         await this.handlePrioritySelection(chatId, data);
+        break;
+
+      // === FOOD ORDERING CALLBACK HANDLERS ===
+      case 'start_restaurant_reg':
+        await this.handleRestaurantRegistrationStep(chatId, 'name');
+        break;
+
+      case 'restaurant_guide':
+        await this.showRestaurantRegistrationGuide(chatId);
+        break;
+
+      case 'start_food_ordering':
+        await this.startFoodOrdering(chatId);
+        break;
+
+      case 'request_location':
+        await this.requestUserLocation(chatId);
+        break;
+
+      case 'enter_address':
+        await this.handleAddressEntry(chatId);
+        break;
+
+      case 'browse_restaurants':
+        await this.showAllRestaurants(chatId);
+        break;
+
+      case 'my_orders':
+        await this.showMyOrders(chatId);
+        break;
+
+      case 'refresh_orders':
+        await this.showMyOrders(chatId);
+        break;
+
+      case 'refresh_restaurants':
+        // Re-request location for fresh restaurant list
+        await this.requestUserLocation(chatId);
         break;
 
     }
@@ -4664,6 +4771,7 @@ Send documents, ask questions, or use commands to get started!
         ['📚 Homework Help', '⏰ Study Timer'],
         ['📅 Events & Deadlines', '🎓 Skills & Courses'],
         ['💰 Crypto Dashboard', '👥 Study Groups'],
+        ['🍽️ Food Ordering', '🏪 Restaurant Hub'],
         ['🔮 Analyze Document', '✨ Help & Commands']
       ],
       resize_keyboard: true,
@@ -4692,6 +4800,10 @@ Send documents, ask questions, or use commands to get started!
     message += `• Portfolio Tracking\n\n`;
     message += `👥 **Collaboration**\n`;
     message += `• Study Groups & Communities\n\n`;
+    message += `🍽️ **Food Delivery**\n`;
+    message += `• Order from nearby restaurants\n`;
+    message += `• Register your restaurant\n`;
+    message += `• Track orders in real-time\n\n`;
     message += `Type /help to see all available commands!`;
 
     await this.bot.sendMessage(chatId, message, {
@@ -4742,6 +4854,11 @@ Send documents, ask questions, or use commands to get started!
     message += `/webinars - Find educational webinars\n`;
     message += `/skills [topic] - Search skills & training\n`;
     message += `/mycourses - Your learning dashboard\n\n`;
+    message += `🍽️ *Food Ordering Commands*\n`;
+    message += `/register_restaurant - Register your restaurant\n`;
+    message += `/order_food - Order food from nearby restaurants\n`;
+    message += `/manage_restaurant - Manage your restaurant\n`;
+    message += `/my_orders - View your food orders\n\n`;
     message += `🔧 *System Commands*\n`;
     message += `/debug - View system status and diagnostics\n`;
     message += `/menu - Show main menu\n`;
@@ -5323,6 +5440,802 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error continuing course:', error);
       await this.bot.sendMessage(chatId, '❌ Error loading course. Please try again.');
+    }
+  }
+
+  // ================================
+  // FOOD ORDERING METHODS
+  // ================================
+
+  async startRestaurantRegistration(chatId) {
+    try {
+      // Check if user already owns a restaurant
+      const existingRestaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      if (existingRestaurant) {
+        await this.bot.sendMessage(chatId, '🏪 You already own a restaurant! Use /manage_restaurant to manage it.');
+        return;
+      }
+
+      let message = `🏪 *Restaurant Registration*\n\n`;
+      message += `Welcome to MidDexBot Food Delivery Platform! 🍽️\n\n`;
+      message += `Let's get your restaurant registered and start receiving orders.\n\n`;
+      message += `📋 *Required Information:*\n`;
+      message += `• Restaurant name and description\n`;
+      message += `• Complete address with location\n`;
+      message += `• Contact phone number\n`;
+      message += `• Cuisine type and operating hours\n`;
+      message += `• Delivery settings\n\n`;
+      message += `⏱️ *Registration takes about 5 minutes*\n\n`;
+      message += `Click "Start Registration" to begin:`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '🚀 Start Registration', callback_data: 'start_restaurant_reg' }],
+          [{ text: '📚 Registration Guide', callback_data: 'restaurant_guide' }],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error starting restaurant registration:', error);
+      await this.bot.sendMessage(chatId, '❌ Error starting registration. Please try again.');
+    }
+  }
+
+  async startFoodOrdering(chatId) {
+    try {
+      let message = `🍽️ *Food Ordering*\n\n`;
+      message += `Order delicious food from nearby restaurants! 🚀\n\n`;
+      message += `📍 *How it works:*\n`;
+      message += `1. Share your location or enter address\n`;
+      message += `2. Browse nearby restaurants\n`;
+      message += `3. Select items and customize\n`;
+      message += `4. Confirm order and pay\n`;
+      message += `5. Track delivery in real-time\n\n`;
+      message += `🎯 *Ready to order?*`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '📍 Share Location', callback_data: 'request_location' }],
+          [{ text: '📝 Enter Address', callback_data: 'enter_address' }],
+          [{ text: '🍕 Browse All Restaurants', callback_data: 'browse_restaurants' }],
+          [{ text: '📦 My Orders', callback_data: 'my_orders' }],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error starting food ordering:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading food ordering. Please try again.');
+    }
+  }
+
+  async showRestaurantManagement(chatId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '🏪 You don\'t own a restaurant yet. Use /register_restaurant to get started!');
+        return;
+      }
+
+      const analytics = await FoodOrderService.getRestaurantAnalytics(chatId);
+      
+      let message = `🏪 *Restaurant Management*\n\n`;
+      message += `📊 *${restaurant.name}*\n`;
+      message += `${restaurant.is_active ? '🟢 Active' : '🔴 Inactive'} • ⭐ ${restaurant.rating}/5.0\n\n`;
+      
+      message += `📈 *Today's Stats:*\n`;
+      message += `• Orders: ${analytics.totalOrders}\n`;
+      message += `• Revenue: $${analytics.totalRevenue.toFixed(2)}\n`;
+      message += `• Avg Order: $${analytics.averageOrderValue.toFixed(2)}\n\n`;
+      
+      message += `🍽️ *Menu Items:* ${restaurant.menuItems.length}\n`;
+      message += `📦 *Pending Orders:* ${analytics.statusBreakdown.pending || 0}\n`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: restaurant.is_active ? '⏸️ Close Restaurant' : '▶️ Open Restaurant', 
+              callback_data: `toggle_restaurant_${restaurant.id}` }
+          ],
+          [
+            { text: '🍽️ Manage Menu', callback_data: `manage_menu_${restaurant.id}` },
+            { text: '📦 View Orders', callback_data: `restaurant_orders_${restaurant.id}` }
+          ],
+          [
+            { text: '📊 Analytics', callback_data: `restaurant_analytics_${restaurant.id}` },
+            { text: '⚙️ Settings', callback_data: `restaurant_settings_${restaurant.id}` }
+          ],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing restaurant management:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurant management. Please try again.');
+    }
+  }
+
+  async showMyOrders(chatId) {
+    try {
+      const orders = await FoodOrderService.getOrderHistory(chatId, 5);
+      
+      if (orders.length === 0) {
+        let message = `📦 *My Orders*\n\n`;
+        message += `No orders found! 🍽️\n\n`;
+        message += `Ready to place your first order?`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '🍕 Order Food', callback_data: 'start_food_ordering' }],
+            [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+        return;
+      }
+
+      let message = `📦 *My Orders*\n\n`;
+      
+      orders.forEach((order, index) => {
+        const statusEmoji = this.getOrderStatusEmoji(order.status);
+        message += `${statusEmoji} *Order #${order.order_number}*\n`;
+        message += `🏪 ${order.restaurant.name}\n`;
+        message += `💰 $${order.total.toFixed(2)} • ${order.status}\n`;
+        message += `📅 ${new Date(order.created_at).toLocaleDateString()}\n\n`;
+      });
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '🔄 Refresh Orders', callback_data: 'refresh_orders' }],
+          [{ text: '🍕 Order Again', callback_data: 'start_food_ordering' }],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing my orders:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading orders. Please try again.');
+    }
+  }
+
+  async showNearbyRestaurants(chatId, latitude, longitude) {
+    try {
+      const restaurants = await FoodOrderService.getNearbyRestaurants(latitude, longitude);
+      
+      if (restaurants.length === 0) {
+        await this.bot.sendMessage(chatId, '😕 No restaurants found in your area. Try expanding your search radius!');
+        return;
+      }
+
+      let message = `🏪 *Nearby Restaurants*\n\n`;
+      message += `📍 Found ${restaurants.length} restaurants near you:\n\n`;
+
+      const keyboard = {
+        inline_keyboard: []
+      };
+
+      restaurants.slice(0, 10).forEach(restaurant => {
+        const distance = restaurant.getDistance(latitude, longitude);
+        const status = restaurant.isOpen() ? '🟢' : '🔴';
+        
+        message += `${status} *${restaurant.name}*\n`;
+        message += `🍽️ ${restaurant.cuisine_type} • ⭐ ${restaurant.rating}/5\n`;
+        message += `📍 ${distance.toFixed(1)} km • 🚚 $${restaurant.delivery_fee}\n`;
+        message += `⏱️ ${restaurant.average_preparation_time} min\n\n`;
+
+        keyboard.inline_keyboard.push([
+          { text: `🍽️ ${restaurant.name}`, callback_data: `restaurant_menu_${restaurant.id}` }
+        ]);
+      });
+
+      keyboard.inline_keyboard.push([
+        { text: '🔄 Refresh', callback_data: 'refresh_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing nearby restaurants:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurants. Please try again.');
+    }
+  }
+
+  async showRestaurantMenu(chatId, restaurantId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantDetails(restaurantId);
+      
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+        return;
+      }
+
+      let message = `🍽️ *${restaurant.name}*\n\n`;
+      message += `${restaurant.isOpen() ? '🟢 Open' : '🔴 Closed'} • ⭐ ${restaurant.rating}/5\n`;
+      message += `🍽️ ${restaurant.cuisine_type}\n`;
+      message += `🚚 Delivery: $${restaurant.delivery_fee} • Min: $${restaurant.minimum_order_amount}\n`;
+      message += `⏱️ Prep time: ${restaurant.average_preparation_time} min\n\n`;
+
+      const menuItems = restaurant.menuItems || [];
+      const categories = [...new Set(menuItems.map(item => item.category))];
+
+      if (categories.length === 0) {
+        message += `😕 No menu items available at the moment.`;
+      } else {
+        message += `📋 *Menu Categories:*\n`;
+        categories.forEach(category => {
+          const items = menuItems.filter(item => item.category === category);
+          message += `\n🍽️ *${category}* (${items.length} items)\n`;
+          items.slice(0, 3).forEach(item => {
+            message += `• ${item.name} - $${item.price.toFixed(2)}\n`;
+          });
+        });
+      }
+
+      const keyboard = {
+        inline_keyboard: []
+      };
+
+      // Add category buttons
+      categories.forEach(category => {
+        keyboard.inline_keyboard.push([
+          { text: `🍽️ ${category}`, callback_data: `menu_category_${restaurantId}_${category}` }
+        ]);
+      });
+
+      keyboard.inline_keyboard.push([
+        { text: '🛒 View Cart', callback_data: `view_cart_${restaurantId}` },
+        { text: '🔙 Back', callback_data: 'browse_restaurants' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing restaurant menu:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading menu. Please try again.');
+    }
+  }
+
+  getOrderStatusEmoji(status) {
+    const statusEmojis = {
+      'pending': '⏳',
+      'confirmed': '✅',
+      'preparing': '👨‍🍳',
+      'ready': '🎯',
+      'out_for_delivery': '🚚',
+      'delivered': '📦',
+      'cancelled': '❌'
+    };
+    return statusEmojis[status] || '❓';
+  }
+
+  async showRestaurantRegistrationGuide(chatId) {
+    let message = `📖 *Restaurant Registration Guide*\n\n`;
+    message += `🏪 *Welcome to MidDexBot Food Delivery!*\n\n`;
+    message += `📋 *What you'll need:*\n`;
+    message += `• Restaurant name and description\n`;
+    message += `• Complete address with coordinates\n`;
+    message += `• Phone number for orders\n`;
+    message += `• Cuisine type (Italian, Chinese, etc.)\n`;
+    message += `• Operating hours (Monday-Sunday)\n`;
+    message += `• Delivery radius (recommended: 5-10 km)\n`;
+    message += `• Delivery fee and minimum order amount\n\n`;
+    message += `⚡ *Quick Setup Process:*\n`;
+    message += `1. Basic restaurant information\n`;
+    message += `2. Location and delivery settings\n`;
+    message += `3. Menu items and pricing\n`;
+    message += `4. Final review and activation\n\n`;
+    message += `💰 *Benefits:*\n`;
+    message += `• Reach new customers instantly\n`;
+    message += `• Real-time order management\n`;
+    message += `• Built-in analytics dashboard\n`;
+    message += `• Zero setup fees\n\n`;
+    message += `Ready to get started? 🚀`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🚀 Start Registration', callback_data: 'start_restaurant_reg' }],
+        [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+      ]
+    };
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  async handleRestaurantRegistrationStep(chatId, step) {
+    // This would implement a multi-step registration process
+    // For now, show a simplified version
+    let message = `🏪 *Restaurant Registration*\n\n`;
+    message += `Step 1: Basic Information\n\n`;
+    message += `Please provide your restaurant details in this format:\n\n`;
+    message += `**Restaurant Name:** Your Restaurant Name\n`;
+    message += `**Description:** Brief description of your restaurant\n`;
+    message += `**Address:** Complete address with street, city, state\n`;
+    message += `**Phone:** Contact phone number\n`;
+    message += `**Cuisine:** Type of cuisine (e.g., Italian, Chinese, Mexican)\n\n`;
+    message += `*Example:*\n`;
+    message += `Restaurant Name: Mario's Pizza Palace\n`;
+    message += `Description: Authentic Italian pizzas made with fresh ingredients\n`;
+    message += `Address: 123 Main St, Downtown, CA 90210\n`;
+    message += `Phone: (555) 123-4567\n`;
+    message += `Cuisine: Italian\n\n`;
+    message += `📝 Please send all information in one message:`;
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown'
+    });
+  }
+
+  async requestUserLocation(chatId) {
+    let message = `📍 *Share Your Location*\n\n`;
+    message += `To find the best restaurants near you, please share your current location.\n\n`;
+    message += `🔒 *Privacy Notice:*\n`;
+    message += `Your location is only used to find nearby restaurants and is not stored permanently.\n\n`;
+    message += `Use the "Share Location" button below or manually enter your address.`;
+
+    const keyboard = {
+      keyboard: [
+        [{ text: '📍 Share My Location', request_location: true }]
+      ],
+      one_time_keyboard: true,
+      resize_keyboard: true
+    };
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  async handleAddressEntry(chatId) {
+    let message = `📝 *Enter Your Address*\n\n`;
+    message += `Please type your delivery address:\n\n`;
+    message += `*Format:* Street Address, City, State/Province\n\n`;
+    message += `*Examples:*\n`;
+    message += `• 123 Main Street, New York, NY\n`;
+    message += `• 456 Oak Avenue, Los Angeles, CA\n`;
+    message += `• 789 Pine Road, Toronto, ON\n\n`;
+    message += `📍 We'll use this to find restaurants that deliver to your area.`;
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: { force_reply: true }
+    });
+  }
+
+  async showAllRestaurants(chatId) {
+    try {
+      // Get all active restaurants without location filtering
+      const { Restaurant } = require('./models');
+      const restaurants = await Restaurant.findAll({
+        where: { is_active: true, is_verified: true },
+        limit: 10,
+        order: [['rating', 'DESC']]
+      });
+
+      if (restaurants.length === 0) {
+        await this.bot.sendMessage(chatId, '😕 No restaurants are currently available. Please try again later!');
+        return;
+      }
+
+      let message = `🏪 *All Restaurants*\n\n`;
+      message += `🍽️ Browse our partner restaurants:\n\n`;
+
+      const keyboard = { inline_keyboard: [] };
+
+      restaurants.forEach(restaurant => {
+        const status = restaurant.isOpen() ? '🟢' : '🔴';
+        message += `${status} *${restaurant.name}*\n`;
+        message += `🍽️ ${restaurant.cuisine_type} • ⭐ ${restaurant.rating}/5\n`;
+        message += `🚚 $${restaurant.delivery_fee} • Min: $${restaurant.minimum_order_amount}\n`;
+        message += `⏱️ ${restaurant.average_preparation_time} min\n\n`;
+
+        keyboard.inline_keyboard.push([
+          { text: `🍽️ ${restaurant.name}`, callback_data: `restaurant_menu_${restaurant.id}` }
+        ]);
+      });
+
+      keyboard.inline_keyboard.push([
+        { text: '📍 Find Near Me', callback_data: 'request_location' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing all restaurants:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurants. Please try again.');
+    }
+  }
+
+  async toggleRestaurantStatus(chatId, restaurantId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      if (!restaurant || restaurant.id !== restaurantId) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found or access denied.');
+        return;
+      }
+
+      const newStatus = !restaurant.is_active;
+      await FoodOrderService.updateRestaurantStatus(chatId, newStatus);
+
+      const statusText = newStatus ? 'opened' : 'closed';
+      const emoji = newStatus ? '🟢' : '🔴';
+      
+      await this.bot.sendMessage(chatId, `${emoji} Restaurant ${statusText} successfully!`);
+      await this.showRestaurantManagement(chatId);
+    } catch (error) {
+      console.error('Error toggling restaurant status:', error);
+      await this.bot.sendMessage(chatId, '❌ Error updating restaurant status. Please try again.');
+    }
+  }
+
+  async showMenuManagement(chatId, restaurantId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      if (!restaurant || restaurant.id !== restaurantId) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found or access denied.');
+        return;
+      }
+
+      const menuItems = await FoodOrderService.getMenuItems(restaurantId);
+      const categories = [...new Set(menuItems.map(item => item.category))];
+
+      let message = `🍽️ *Menu Management*\n\n`;
+      message += `📊 *${restaurant.name}*\n`;
+      message += `Total Items: ${menuItems.length}\n`;
+      message += `Categories: ${categories.length}\n\n`;
+
+      if (categories.length > 0) {
+        message += `📋 *Categories:*\n`;
+        categories.forEach(category => {
+          const items = menuItems.filter(item => item.category === category);
+          const available = items.filter(item => item.is_available).length;
+          message += `• ${category}: ${available}/${items.length} available\n`;
+        });
+      }
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '➕ Add Menu Item', callback_data: `add_menu_item_${restaurantId}` }],
+          [{ text: '📝 Edit Menu', callback_data: `edit_menu_${restaurantId}` }],
+          [{ text: '🔙 Back to Management', callback_data: 'manage_restaurant' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing menu management:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading menu management. Please try again.');
+    }
+  }
+
+  async showRestaurantOrders(chatId, restaurantId) {
+    try {
+      const orders = await FoodOrderService.getRestaurantOrders(chatId);
+      
+      if (orders.length === 0) {
+        await this.bot.sendMessage(chatId, '📦 No orders yet! Your first order will appear here.');
+        return;
+      }
+
+      let message = `📦 *Restaurant Orders*\n\n`;
+      
+      const pendingOrders = orders.filter(order => ['pending', 'confirmed', 'preparing'].includes(order.status));
+      const recentOrders = orders.slice(0, 10);
+
+      if (pendingOrders.length > 0) {
+        message += `⏳ *Active Orders (${pendingOrders.length}):*\n`;
+        pendingOrders.forEach(order => {
+          const statusEmoji = this.getOrderStatusEmoji(order.status);
+          message += `${statusEmoji} #${order.order_number} - $${order.total.toFixed(2)}\n`;
+          message += `👤 ${order.customer.first_name} • ${order.status}\n\n`;
+        });
+      }
+
+      message += `📊 *Recent Orders:*\n`;
+      recentOrders.slice(0, 5).forEach(order => {
+        const statusEmoji = this.getOrderStatusEmoji(order.status);
+        message += `${statusEmoji} #${order.order_number} - $${order.total.toFixed(2)}\n`;
+      });
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '🔄 Refresh Orders', callback_data: `restaurant_orders_${restaurantId}` }],
+          [{ text: '📊 Order Analytics', callback_data: `restaurant_analytics_${restaurantId}` }],
+          [{ text: '🔙 Back to Management', callback_data: 'manage_restaurant' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing restaurant orders:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading orders. Please try again.');
+    }
+  }
+
+  async showRestaurantAnalytics(chatId, restaurantId) {
+    try {
+      const analytics = await FoodOrderService.getRestaurantAnalytics(chatId, 7);
+      
+      let message = `📊 *Restaurant Analytics*\n\n`;
+      message += `📈 *Last 7 Days Performance:*\n\n`;
+      message += `📦 Total Orders: ${analytics.totalOrders}\n`;
+      message += `💰 Total Revenue: $${analytics.totalRevenue.toFixed(2)}\n`;
+      message += `📊 Average Order: $${analytics.averageOrderValue.toFixed(2)}\n\n`;
+
+      if (Object.keys(analytics.statusBreakdown).length > 0) {
+        message += `📋 *Order Status:*\n`;
+        Object.entries(analytics.statusBreakdown).forEach(([status, count]) => {
+          const emoji = this.getOrderStatusEmoji(status);
+          message += `${emoji} ${status}: ${count}\n`;
+        });
+        message += `\n`;
+      }
+
+      if (Object.keys(analytics.popularItems).length > 0) {
+        message += `🔥 *Popular Items:*\n`;
+        const sortedItems = Object.entries(analytics.popularItems)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 5);
+        
+        sortedItems.forEach(([item, count]) => {
+          message += `• ${item}: ${count} orders\n`;
+        });
+      }
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '📊 Extended Analytics', callback_data: `analytics_extended_${restaurantId}` }],
+          [{ text: '📈 Sales Report', callback_data: `sales_report_${restaurantId}` }],
+          [{ text: '🔙 Back to Management', callback_data: 'manage_restaurant' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing restaurant analytics:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading analytics. Please try again.');
+    }
+  }
+
+  async showRestaurantSettings(chatId, restaurantId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+        return;
+      }
+
+      let message = `⚙️ *Restaurant Settings*\n\n`;
+      message += `🏪 *${restaurant.name}*\n\n`;
+      message += `📍 Address: ${restaurant.address}\n`;
+      message += `📞 Phone: ${restaurant.phone}\n`;
+      message += `🍽️ Cuisine: ${restaurant.cuisine_type}\n`;
+      message += `🚚 Delivery Fee: $${restaurant.delivery_fee}\n`;
+      message += `💰 Min Order: $${restaurant.minimum_order_amount}\n`;
+      message += `📏 Delivery Radius: ${restaurant.delivery_radius} km\n`;
+      message += `⏱️ Prep Time: ${restaurant.average_preparation_time} min\n`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '📝 Edit Details', callback_data: `edit_restaurant_${restaurantId}` }],
+          [{ text: '💰 Update Pricing', callback_data: `update_pricing_${restaurantId}` }],
+          [{ text: '⏰ Operating Hours', callback_data: `edit_hours_${restaurantId}` }],
+          [{ text: '🚚 Delivery Settings', callback_data: `delivery_settings_${restaurantId}` }],
+          [{ text: '🔙 Back to Management', callback_data: 'manage_restaurant' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing restaurant settings:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading settings. Please try again.');
+    }
+  }
+
+  async showMenuCategory(chatId, restaurantId, category) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantDetails(restaurantId);
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+        return;
+      }
+
+      const categoryItems = restaurant.menuItems.filter(item => 
+        item.category === category && item.is_available
+      );
+
+      let message = `🍽️ *${restaurant.name}*\n`;
+      message += `📋 *${category}*\n\n`;
+
+      if (categoryItems.length === 0) {
+        message += `😕 No items available in this category.`;
+      } else {
+        categoryItems.forEach(item => {
+          message += `🍽️ *${item.name}*\n`;
+          message += `💰 $${item.price.toFixed(2)}\n`;
+          if (item.description) {
+            message += `📝 ${item.description}\n`;
+          }
+          message += `⏱️ ${item.preparation_time} min\n\n`;
+        });
+      }
+
+      const keyboard = {
+        inline_keyboard: []
+      };
+
+      // Add item selection buttons
+      categoryItems.forEach(item => {
+        keyboard.inline_keyboard.push([
+          { text: `➕ ${item.name} - $${item.price.toFixed(2)}`, 
+            callback_data: `add_to_cart_${item.id}` }
+        ]);
+      });
+
+      keyboard.inline_keyboard.push([
+        { text: '🛒 View Cart', callback_data: `view_cart_${restaurantId}` },
+        { text: '🔙 Back to Menu', callback_data: `restaurant_menu_${restaurantId}` }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing menu category:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading menu category. Please try again.');
+    }
+  }
+
+  async showCart(chatId, restaurantId) {
+    // This would implement cart functionality
+    // For now, show a placeholder
+    let message = `🛒 *Shopping Cart*\n\n`;
+    message += `Your cart is empty! 🛍️\n\n`;
+    message += `Browse the menu and add items to your cart to get started.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🍽️ Browse Menu', callback_data: `restaurant_menu_${restaurantId}` }],
+        [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+      ]
+    };
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  async showRestaurantHub(chatId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantByOwner(chatId);
+      
+      let message = `🏪 *Restaurant Hub*\n\n`;
+      
+      if (restaurant) {
+        // User owns a restaurant
+        message += `👋 Welcome back, ${restaurant.name} owner!\n\n`;
+        message += `📊 *Quick Stats:*\n`;
+        message += `• Status: ${restaurant.is_active ? '🟢 Active' : '🔴 Inactive'}\n`;
+        message += `• Rating: ⭐ ${restaurant.rating}/5.0\n`;
+        message += `• Cuisine: 🍽️ ${restaurant.cuisine_type}\n\n`;
+        message += `Choose an option below:`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '🏪 Manage Restaurant', callback_data: 'manage_restaurant' }],
+            [{ text: '📦 View Orders', callback_data: `restaurant_orders_${restaurant.id}` }],
+            [{ text: '🍽️ Manage Menu', callback_data: `manage_menu_${restaurant.id}` }],
+            [{ text: '📊 Analytics', callback_data: `restaurant_analytics_${restaurant.id}` }],
+            [{ text: '🍕 Order Food', callback_data: 'start_food_ordering' }],
+            [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      } else {
+        // User doesn't own a restaurant
+        message += `Welcome to the Restaurant Hub! 🎉\n\n`;
+        message += `🍽️ *For Customers:*\n`;
+        message += `• Order delicious food from local restaurants\n`;
+        message += `• Track your orders in real-time\n`;
+        message += `• Rate and review your experience\n\n`;
+        message += `🏪 *For Restaurant Owners:*\n`;
+        message += `• Register your restaurant for free\n`;
+        message += `• Manage orders and menu items\n`;
+        message += `• Access detailed analytics\n`;
+        message += `• Reach new customers instantly\n\n`;
+        message += `What would you like to do?`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '🍕 Order Food', callback_data: 'start_food_ordering' }],
+            [{ text: '🏪 Register Restaurant', callback_data: 'start_restaurant_reg' }],
+            [{ text: '📦 My Orders', callback_data: 'my_orders' }],
+            [{ text: '🏪 Browse Restaurants', callback_data: 'browse_restaurants' }],
+            [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+    } catch (error) {
+      console.error('Error showing restaurant hub:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurant hub. Please try again.');
+    }
+  }
+
+  async handleLocation(msg) {
+    const chatId = msg.chat.id;
+    const { latitude, longitude } = msg.location;
+    
+    try {
+      await this.bot.sendMessage(chatId, '📍 Location received! Finding nearby restaurants...');
+      
+      // Store location temporarily for future use
+      await this.conversationManager.setUserData(chatId, 'userLocation', {
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: Date.now()
+      });
+      
+      // Show nearby restaurants
+      await this.showNearbyRestaurants(chatId, latitude, longitude);
+    } catch (error) {
+      console.error('Error handling location:', error);
+      await this.bot.sendMessage(chatId, '❌ Error processing location. Please try again.');
     }
   }
 }

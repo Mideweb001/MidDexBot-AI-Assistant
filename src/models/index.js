@@ -28,6 +28,12 @@ const Event = require('./Event')(sequelize);
 const Course = require('./Course')(sequelize);
 const UserCourse = require('./UserCourse')(sequelize);
 
+// Food ordering models
+const Restaurant = require('./Restaurant')(sequelize);
+const MenuItem = require('./MenuItem')(sequelize);
+const FoodOrder = require('./FoodOrder')(sequelize);
+const OrderItem = require('./OrderItem')(sequelize);
+
 // Define associations
 User.hasMany(Document, { foreignKey: 'user_id', as: 'documents' });
 Document.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
@@ -113,6 +119,26 @@ Course.belongsToMany(User, {
   as: 'enrolledUsers'
 });
 
+// Restaurant associations
+User.hasMany(Restaurant, { foreignKey: 'owner_id', as: 'ownedRestaurants' });
+Restaurant.belongsTo(User, { foreignKey: 'owner_id', as: 'owner' });
+
+Restaurant.hasMany(MenuItem, { foreignKey: 'restaurant_id', as: 'menuItems' });
+MenuItem.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant' });
+
+// Food Order associations
+User.hasMany(FoodOrder, { foreignKey: 'customer_id', as: 'foodOrders' });
+FoodOrder.belongsTo(User, { foreignKey: 'customer_id', as: 'customer' });
+
+Restaurant.hasMany(FoodOrder, { foreignKey: 'restaurant_id', as: 'orders' });
+FoodOrder.belongsTo(Restaurant, { foreignKey: 'restaurant_id', as: 'restaurant' });
+
+FoodOrder.hasMany(OrderItem, { foreignKey: 'order_id', as: 'items' });
+OrderItem.belongsTo(FoodOrder, { foreignKey: 'order_id', as: 'order' });
+
+MenuItem.hasMany(OrderItem, { foreignKey: 'menu_item_id', as: 'orderItems' });
+OrderItem.belongsTo(MenuItem, { foreignKey: 'menu_item_id', as: 'menuItem' });
+
 module.exports = {
   sequelize,
   User,
@@ -128,5 +154,9 @@ module.exports = {
   HomeworkSession,
   Event,
   Course,
-  UserCourse
+  UserCourse,
+  Restaurant,
+  MenuItem,
+  FoodOrder,
+  OrderItem
 };
