@@ -27,6 +27,15 @@ class TelegramDocumentBot {
     this.port = process.env.PORT || 3000;
     this.webhookUrl = process.env.WEBHOOK_URL;
     this.isProduction = process.env.NODE_ENV === 'production';
+
+    // Normalize webhook base URL (remove trailing / or /webhook to avoid duplication)
+    if (this.webhookUrl) {
+      const originalWebhook = this.webhookUrl;
+      this.webhookUrl = this.webhookUrl.replace(/\/$/, '').replace(/\/webhook$/i, '');
+      if (originalWebhook !== this.webhookUrl) {
+        console.log(`ℹ️ Normalized WEBHOOK_URL from '${originalWebhook}' to '${this.webhookUrl}'`);
+      }
+    }
     
     if (!this.botToken) {
       console.error('❌ TELEGRAM_BOT_TOKEN is required');
@@ -43,11 +52,12 @@ class TelegramDocumentBot {
     this.pdfGenerator = new PDFGenerator();
     this.studyAssistant = new StudyAssistant();
     
-    // Initialize crypto services
-    this.cryptoService = new CryptoService();
-    this.cryptoNewsService = new CryptoNewsService();
-    this.cryptoAlertMonitor = new CryptoAlertMonitor(this.bot);
-    this.cryptoInventoryService = new CryptoInventoryService();
+  // Initialize crypto services
+  this.cryptoService = new CryptoService();
+  this.cryptoNewsService = new CryptoNewsService();
+  // Note: bot is created below; we'll inject it after initialization
+  this.cryptoAlertMonitor = new CryptoAlertMonitor(undefined);
+  this.cryptoInventoryService = new CryptoInventoryService();
     
     // Initialize study group service
     this.studyGroupService = StudyGroupService;
@@ -71,6 +81,11 @@ class TelegramDocumentBot {
       // Development: Use polling
       this.bot = new TelegramBot(this.botToken, { polling: true });
     }
+
+    // Provide bot instance to any services created before bot
+    if (this.cryptoAlertMonitor) {
+      this.cryptoAlertMonitor.bot = this.bot;
+    }
     
     // Initialize Express app
     this.app = express();
@@ -88,9 +103,14 @@ class TelegramDocumentBot {
     
     // Webhook endpoint for production
     if (this.isProduction && this.webhookUrl) {
+      // Webhook POST (Telegram delivers updates here)
       this.app.post('/webhook', (req, res) => {
         this.bot.processUpdate(req.body);
         res.sendStatus(200);
+      });
+      // Simple GET/HEAD handler for diagnostics (Telegram won't use it but helps verify route exists)
+      this.app.get('/webhook', (req, res) => {
+        res.status(200).json({ status: 'webhook-ok', timestamp: new Date().toISOString() });
       });
     }
 
@@ -763,6 +783,13 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     // Error handling
     this.bot.on('error', (error) => {
       console.error('🚨 Telegram Bot Error:', error);
+    });
+    // Additional diagnostics for non-response scenarios
+    this.bot.on('polling_error', (error) => {
+      console.error('🚨 Polling error:', error?.response?.body || error.message || error);
+    });
+    this.bot.on('webhook_error', (error) => {
+      console.error('🚨 Webhook error:', error?.message || error);
     });
 
     console.log('✅ Telegram bot handlers initialized');
@@ -3200,8 +3227,23 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
       // Configure webhook for production
       if (this.isProduction && this.webhookUrl) {
         console.log('🔗 Setting up webhook for production...');
-        await this.bot.setWebHook(`${this.webhookUrl}/webhook`);
-        console.log(`✅ Webhook set to: ${this.webhookUrl}/webhook`);
+        const fullWebhook = `${this.webhookUrl}/webhook`;
+        try {
+          const setResult = await this.bot.setWebHook(fullWebhook);
+          console.log(`✅ Webhook set to: ${fullWebhook}`, setResult);
+          
+          // Verify webhook was set
+          const webhookInfo = await this.bot.getWebHookInfo();
+          console.log(`📡 Webhook verification:`, {
+            url: webhookInfo.url,
+            has_custom_certificate: webhookInfo.has_custom_certificate,
+            pending_update_count: webhookInfo.pending_update_count,
+            last_error_date: webhookInfo.last_error_date,
+            last_error_message: webhookInfo.last_error_message
+          });
+        } catch (whError) {
+          console.error('❌ Failed to set webhook:', whError.message);
+        }
       } else {
         console.log('🔄 Running in development mode with polling');
       }
@@ -3212,7 +3254,7 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
         console.log(`💎 Bot is active and listening for messages`);
         console.log(`🌟 Health check: http://localhost:${this.port}/health`);
         if (this.isProduction && this.webhookUrl) {
-          console.log(`🔗 Webhook endpoint: ${this.webhookUrl}/webhook`);
+          console.log(`🔗 Webhook endpoint configured: ${this.webhookUrl}/webhook`);
         }
       });
 
