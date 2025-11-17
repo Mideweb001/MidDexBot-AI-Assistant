@@ -1,0 +1,86 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  
+  - type: input
+    id: bot-version
+    attributes:
+      label: Bot Version
+      description: What version of MidDexBot are you using?
+      placeholder: e.g., v2.1.0
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: command-category
+    attributes:
+      label: Command Category
+      description: Which category of commands is affected?
+      options:
+        - Career Commands (/analyze, /improve, /cover, /score)
+        - Crypto Commands (/crypto, /cryptonews, /watchlist)
+        - Study Commands (/research, /homework, /study, /timer)
+        - Study Group Commands (/studygroup, /creategroup, /joingroup)
+        - Event Commands (/addevent, /events, /countdown)
+        - Course Commands (/courses, /webinars, /skills)
+        - System Commands (/start, /help, /menu, /debug)
+        - File Processing (PDF, Image, Document upload)
+        - Other
+  
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of what the bug is
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+  
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Send command '/example'
+        2. Upload file '...'
+        3. See error
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages/Logs
+      description: Any error messages or logs you received
+      render: shell
+  
+  - type: input
+    id: telegram-client
+    attributes:
+      label: Telegram Client
+      description: Which Telegram client are you using?
+      placeholder: e.g., Telegram Desktop, Mobile App, Web
+  
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
