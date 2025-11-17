@@ -162,38 +162,39 @@ module.exports = (sequelize) => {
 
   // Instance methods
   Order.prototype.getStatusEmoji = function() {
+    // Business marketplace order emojis (different from food orders)
     const emojiMap = {
-      'pending': '🕐',
-      'confirmed': '✅',
-      'preparing': '👨‍🍳',
-      'ready': '✨',
-      'out_for_delivery': '🚚',
-      'delivered': '🎉',
-      'cancelled': '❌',
-      'rejected': '🚫'
+      'pending': '⏳',
+      'confirmed': '✔️',
+      'preparing': '⚙️',
+      'ready': '✅',
+      'out_for_delivery': '�',
+      'delivered': '✨',
+      'cancelled': '🚫',
+      'rejected': '❎'
     };
     return emojiMap[this.status] || '📦';
   };
 
   Order.prototype.getFormattedInfo = function() {
-    let info = `📦 *Order ${this.order_number}*\n\n`;
+    let info = `�️ *Order ${this.order_number}*\n\n`;
     info += `${this.getStatusEmoji()} Status: ${this.status.replace('_', ' ').toUpperCase()}\n`;
-    info += `💰 Total: $${parseFloat(this.total_amount).toFixed(2)}\n`;
+    info += `� Total: $${parseFloat(this.total_amount).toFixed(2)}\n`;
     
     if (this.delivery_type === 'delivery') {
-      info += `🚚 Delivery Fee: $${parseFloat(this.delivery_fee).toFixed(2)}\n`;
+      info += `� Delivery Fee: $${parseFloat(this.delivery_fee).toFixed(2)}\n`;
       info += `📍 Address: ${this.delivery_address}\n`;
     } else {
-      info += `🏪 Type: Pickup\n`;
+      info += `� Type: Pickup\n`;
     }
     
-    info += `\n📝 *Items:*\n`;
+    info += `\n� *Items:*\n`;
     this.items.forEach((item, index) => {
       info += `${index + 1}. ${item.name} x${item.quantity} - $${parseFloat(item.price * item.quantity).toFixed(2)}\n`;
     });
     
     if (this.special_instructions) {
-      info += `\n📌 *Special Instructions:*\n${this.special_instructions}\n`;
+      info += `\n� *Special Instructions:*\n${this.special_instructions}\n`;
     }
     
     if (this.estimated_delivery_time) {

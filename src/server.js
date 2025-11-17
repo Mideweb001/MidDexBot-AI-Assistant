@@ -788,6 +788,22 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showMyBusinesses(chatId);
     });
 
+    // Alternative command formats (without underscores)
+    this.bot.onText(/\/registerbusiness/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.startBusinessRegistration(chatId);
+    });
+
+    this.bot.onText(/\/mybusiness/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showMyBusinesses(chatId);
+    });
+
+    this.bot.onText(/\/myorders/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showUserOrders(chatId);
+    });
+
     // Document handler
     this.bot.on('document', async (msg) => {
       await this.handleDocument(msg);
@@ -6619,11 +6635,11 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
-      const message = `🏢 *Business Registration*\n\n` +
+      const message = `� *Business Registration*\n\n` +
         `Welcome to the business marketplace! Let's get your business registered.\n\n` +
         `Please provide your business name:`;
 
@@ -6634,7 +6650,7 @@ Send documents, ask questions, or use commands to get started!
       await this.conversationManager.setUserData(chatId, 'businessData', {});
     } catch (error) {
       console.error('Error starting business registration:', error);
-      await this.bot.sendMessage(chatId, '❌ Error starting registration. Please try again.');
+      await this.bot.sendMessage(chatId, '⚠️ Error starting registration. Please try again.');
     }
   }
 
@@ -6643,7 +6659,7 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
@@ -6654,7 +6670,7 @@ Send documents, ask questions, or use commands to get started!
 
       if (!query && !userLat) {
         // Show search options
-        const message = `🔍 *Search Businesses*\n\n` +
+        const message = `� *Search Businesses*\n\n` +
           `Choose a search method:\n\n` +
           `📍 Share your location to find nearby businesses\n` +
           `🏷️ Browse by category\n` +
@@ -6675,7 +6691,7 @@ Send documents, ask questions, or use commands to get started!
         return;
       }
 
-      await this.bot.sendMessage(chatId, '🔍 Searching for businesses...');
+      await this.bot.sendMessage(chatId, '� Searching for businesses...');
 
       const result = await BusinessService.searchBusinesses(query, userLat, userLng);
 
@@ -6719,7 +6735,7 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
@@ -6733,7 +6749,7 @@ Send documents, ask questions, or use commands to get started!
       const result = await BusinessService.getBusinessDetails(businessId);
 
       if (!result.success) {
-        await this.bot.sendMessage(chatId, '❌ Business not found.');
+        await this.bot.sendMessage(chatId, '⚠️ Business not found.');
         return;
       }
 
@@ -6757,7 +6773,7 @@ Send documents, ask questions, or use commands to get started!
 
       keyboard.inline_keyboard.push(
         [{ text: '🛒 View Cart', callback_data: `view_cart_${businessId}` }],
-        [{ text: '✅ Complete Order', callback_data: `complete_order_${businessId}` }],
+        [{ text: '✔️ Complete Order', callback_data: `complete_order_${businessId}` }],
         [{ text: '🔙 Back to Search', callback_data: 'search_menu' }]
       );
 
@@ -6773,7 +6789,7 @@ Send documents, ask questions, or use commands to get started!
       });
     } catch (error) {
       console.error('Error starting order:', error);
-      await this.bot.sendMessage(chatId, '❌ Error starting order. Please try again.');
+      await this.bot.sendMessage(chatId, '⚠️ Error starting order. Please try again.');
     }
   }
 
@@ -6782,7 +6798,7 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
@@ -6791,7 +6807,7 @@ Send documents, ask questions, or use commands to get started!
         const result = await BusinessService.getCustomerOrders(user.id);
         
         if (!result.success || result.orders.length === 0) {
-          await this.bot.sendMessage(chatId, '❌ No orders found to review.');
+          await this.bot.sendMessage(chatId, '⚠️ No orders found to review.');
           return;
         }
 
@@ -6855,7 +6871,7 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
@@ -6863,29 +6879,29 @@ Send documents, ask questions, or use commands to get started!
 
       if (!result.success || result.orders.length === 0) {
         await this.bot.sendMessage(chatId, 
-          '📦 You haven\'t placed any orders yet.\n\nUse /search to find businesses and place your first order!',
+          '�️ You haven\'t placed any orders yet.\n\nUse /search to find businesses and place your first order!',
           {
             reply_markup: {
-              inline_keyboard: [[{ text: '🔍 Search Businesses', callback_data: 'search_menu' }]]
+              inline_keyboard: [[{ text: '� Search Businesses', callback_data: 'search_menu' }]]
             }
           }
         );
         return;
       }
 
-      let message = `📦 *Your Orders* (${result.count} total)\n\n`;
+      let message = `�️ *Your Orders* (${result.count} total)\n\n`;
 
       result.orders.forEach((order, index) => {
         const statusEmoji = this.getOrderStatusEmoji(order.status);
         message += `${index + 1}. ${statusEmoji} Order ${order.order_number}\n`;
-        message += `   💰 $${parseFloat(order.total_amount).toFixed(2)} • ${order.status}\n`;
+        message += `   � $${parseFloat(order.total_amount).toFixed(2)} • ${order.status}\n`;
         message += `   📅 ${new Date(order.created_at).toLocaleDateString()}\n\n`;
       });
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: '🔍 Track Order', callback_data: 'track_order' }],
-          [{ text: '🔍 Search More', callback_data: 'search_menu' }],
+          [{ text: '� Track Order', callback_data: 'track_order' }],
+          [{ text: '� Search More', callback_data: 'search_menu' }],
           [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
         ]
       };
@@ -6905,7 +6921,7 @@ Send documents, ask questions, or use commands to get started!
       const user = await this.databaseService.getUserByTelegramId(chatId);
       
       if (!user) {
-        await this.bot.sendMessage(chatId, '❌ Please start the bot first with /start');
+        await this.bot.sendMessage(chatId, '⚠️ Please start the bot first with /start');
         return;
       }
 
@@ -6917,23 +6933,23 @@ Send documents, ask questions, or use commands to get started!
 
       if (businesses.length === 0) {
         await this.bot.sendMessage(chatId,
-          '🏢 You haven\'t registered any businesses yet.\n\nUse /register_business to get started!',
+          '� You haven\'t registered any businesses yet.\n\nUse /registerbusiness to get started!',
           {
             reply_markup: {
-              inline_keyboard: [[{ text: '🏢 Register Business', callback_data: 'start_business_reg' }]]
+              inline_keyboard: [[{ text: '� Register Business', callback_data: 'start_business_reg' }]]
             }
           }
         );
         return;
       }
 
-      let message = `🏢 *Your Businesses* (${businesses.length})\n\n`;
+      let message = `� *Your Businesses* (${businesses.length})\n\n`;
 
       businesses.forEach((business, index) => {
         message += `${index + 1}. *${business.business_name}*\n`;
         message += `   📂 ${business.category}\n`;
         message += `   ⭐ ${business.rating ? business.rating.toFixed(1) : 'No rating'}\n`;
-        message += `   ${business.is_active ? '🟢 Active' : '🔴 Inactive'}\n`;
+        message += `   ${business.is_active ? '✅ Active' : '🔴 Inactive'}\n`;
         message += `   ID: \`${business.id}\`\n\n`;
       });
 
@@ -6955,22 +6971,23 @@ Send documents, ask questions, or use commands to get started!
       });
     } catch (error) {
       console.error('Error showing businesses:', error);
-      await this.bot.sendMessage(chatId, '❌ Error loading businesses. Please try again.');
+      await this.bot.sendMessage(chatId, '⚠️ Error loading businesses. Please try again.');
     }
   }
 
   getOrderStatusEmoji(status) {
+    // Business marketplace order emojis (glass/modern style)
     const emojiMap = {
-      'pending': '🕐',
-      'confirmed': '✅',
-      'preparing': '👨‍🍳',
-      'ready': '✨',
-      'out_for_delivery': '🚚',
-      'delivered': '🎉',
-      'cancelled': '❌',
-      'rejected': '🚫'
+      'pending': '⏳',
+      'confirmed': '✔️',
+      'preparing': '⚙️',
+      'ready': '✅',
+      'out_for_delivery': '�',
+      'delivered': '✨',
+      'cancelled': '🚫',
+      'rejected': '❎'
     };
-    return emojiMap[status] || '📦';
+    return emojiMap[status] || '�️';
   }
 }
 
