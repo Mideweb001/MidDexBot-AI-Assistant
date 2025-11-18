@@ -246,6 +246,49 @@ class CourseService {
     }
   }
 
+  async getUserCourseStats(userId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(userId);
+      if (!user) {
+        return {
+          totalEnrolled: 0,
+          completed: 0,
+          inProgress: 0,
+          averageRating: 0
+        };
+      }
+
+      const enrollments = await UserCourse.findAll({
+        where: { user_id: user.id },
+        include: [{ model: Course, as: 'course' }]
+      });
+
+      const stats = {
+        totalEnrolled: enrollments.length,
+        completed: enrollments.filter(e => e.enrollment_status === 'completed').length,
+        inProgress: enrollments.filter(e => e.enrollment_status === 'in_progress').length,
+        averageRating: 0
+      };
+
+      // Calculate average rating of enrolled courses
+      const ratingsSum = enrollments.reduce((sum, e) => {
+        return sum + (e.Course?.rating || 0);
+      }, 0);
+      
+      stats.averageRating = stats.totalEnrolled > 0 ? ratingsSum / stats.totalEnrolled : 0;
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting user course stats:', error);
+      return {
+        totalEnrolled: 0,
+        completed: 0,
+        inProgress: 0,
+        averageRating: 0
+      };
+    }
+  }
+
   // === EXTERNAL API INTEGRATIONS ===
 
   async fetchYouTubeEducationalVideos(query, maxResults = 10) {

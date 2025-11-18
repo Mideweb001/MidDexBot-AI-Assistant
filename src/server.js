@@ -1409,6 +1409,20 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.bot.sendMessage(chatId, '⏰ **Study Timer**\n\nHow many minutes would you like to study?\n\nRecommended sessions:\n• 25 minutes (Pomodoro)\n• 45 minutes (Deep focus)\n• 90 minutes (Learning session)\n\nExample: /timer 25');
         break;
 
+      case 'research_tool':
+        await this.bot.sendMessage(chatId, '🔍 *Research Assistant*\n\nWhat topic would you like me to research?\n\nExample: "artificial intelligence in education" or "renewable energy sources"', {
+          parse_mode: 'Markdown',
+          reply_markup: { force_reply: true }
+        });
+        break;
+
+      case 'smart_notes':
+        await this.bot.sendMessage(chatId, '📝 *Smart Notes Creator*\n\nSend me content to convert into organized study notes!\n\nYou can:\n• Paste text directly\n• Send a topic to generate notes about\n• Upload a document', {
+          parse_mode: 'Markdown',
+          reply_markup: { force_reply: true }
+        });
+        break;
+
       case 'research_to_notes':
         if (lastDoc && lastDoc.analysis) {
           await this.bot.sendMessage(chatId, '📝 Converting research to smart notes...');
