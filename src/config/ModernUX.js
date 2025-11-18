@@ -1,0 +1,372 @@
+/**
+ * Modern UX Interface Configuration
+ * Glass Bitmoji Style - Latest Design System
+ * 
+ * This file contains all UI elements with upgraded glass-style emojis
+ * organized in a user-friendly hierarchy
+ */
+
+const ModernUX = {
+  
+  // ===== MAIN CATEGORIES =====
+  categories: {
+    marketplace: {
+      icon: '🛍️',
+      name: 'Marketplace',
+      description: 'Shop local businesses',
+      gradient: '🌟'
+    },
+    food: {
+      icon: '🍽️',
+      name: 'Food Delivery',
+      description: 'Order delicious meals',
+      gradient: '🔥'
+    },
+    study: {
+      icon: '📚',
+      name: 'Study Hub',
+      description: 'AI-powered learning',
+      gradient: '✨'
+    },
+    career: {
+      icon: '💼',
+      name: 'Career Tools',
+      description: 'Professional development',
+      gradient: '🚀'
+    },
+    crypto: {
+      icon: '💰',
+      name: 'Crypto Trading',
+      description: 'Track & trade crypto',
+      gradient: '📈'
+    },
+    quick: {
+      icon: '🎯',
+      name: 'Quick Actions',
+      description: 'Fast access features',
+      gradient: '⚡'
+    }
+  },
+
+  // ===== MARKETPLACE SECTION =====
+  marketplace: {
+    main: {
+      title: '🛍️ *Marketplace Hub*',
+      subtitle: 'Discover & Shop Local Businesses',
+      actions: [
+        { emoji: '🔎', label: 'Search Businesses', command: '/search' },
+        { emoji: '🏬', label: 'My Business', command: '/mybusiness' },
+        { emoji: '🛒', label: 'My Orders', command: '/myorders' },
+        { emoji: '➕', label: 'Register Business', command: '/registerbusiness' }
+      ]
+    },
+    statuses: {
+      pending: { emoji: '⏳', label: 'Processing' },
+      confirmed: { emoji: '✔️', label: 'Confirmed' },
+      preparing: { emoji: '⚙️', label: 'Preparing' },
+      ready: { emoji: '✅', label: 'Ready' },
+      out_for_delivery: { emoji: '🚗', label: 'On the Way' },
+      delivered: { emoji: '✨', label: 'Delivered' },
+      cancelled: { emoji: '🚫', label: 'Cancelled' },
+      rejected: { emoji: '❎', label: 'Rejected' }
+    },
+    categories: [
+      { emoji: '🍕', name: 'Food & Dining' },
+      { emoji: '💻', name: 'Electronics & Tech' },
+      { emoji: '🔧', name: 'Services' },
+      { emoji: '👗', name: 'Fashion & Apparel' },
+      { emoji: '💄', name: 'Health & Beauty' },
+      { emoji: '🏡', name: 'Home & Garden' },
+      { emoji: '🚗', name: 'Automotive' },
+      { emoji: '📚', name: 'Education' },
+      { emoji: '🎬', name: 'Entertainment' },
+      { emoji: '🎁', name: 'Other' }
+    ]
+  },
+
+  // ===== FOOD DELIVERY SECTION =====
+  food: {
+    main: {
+      title: '🍽️ *Food Delivery Hub*',
+      subtitle: 'Order from Top Restaurants',
+      actions: [
+        { emoji: '🍕', label: 'Browse Restaurants', command: '/restaurants' },
+        { emoji: '🛒', label: 'Start Order', command: '/orderfood' },
+        { emoji: '📦', label: 'My Orders', command: '/orders' },
+        { emoji: '🏪', label: 'Register Restaurant', command: '/registerrestaurant' }
+      ]
+    },
+    statuses: {
+      pending: { emoji: '🕐', label: 'Received' },
+      confirmed: { emoji: '✅', label: 'Confirmed' },
+      preparing: { emoji: '👨‍🍳', label: 'Cooking' },
+      ready: { emoji: '✨', label: 'Ready' },
+      out_for_delivery: { emoji: '🚚', label: 'Delivering' },
+      delivered: { emoji: '🎉', label: 'Delivered' },
+      cancelled: { emoji: '❌', label: 'Cancelled' }
+    }
+  },
+
+  // ===== STUDY HUB SECTION =====
+  study: {
+    main: {
+      title: '📚 *Study Hub*',
+      subtitle: 'AI-Powered Learning Assistant',
+      sections: [
+        {
+          name: 'Learning Tools',
+          emoji: '🎓',
+          actions: [
+            { emoji: '🔍', label: 'Research Assistant', command: '/research' },
+            { emoji: '📝', label: 'Smart Notes', command: '/notes' },
+            { emoji: '📖', label: 'Study Plan', command: '/study' },
+            { emoji: '⏱️', label: 'Study Timer', command: '/timer' }
+          ]
+        },
+        {
+          name: 'Homework Help',
+          emoji: '✏️',
+          actions: [
+            { emoji: '❓', label: 'Get Help', command: '/homework' },
+            { emoji: '📋', label: 'My Homework', command: '/myhomework' },
+            { emoji: '🧠', label: 'AI Tutor', command: '/askhw' }
+          ]
+        },
+        {
+          name: 'Collaboration',
+          emoji: '👥',
+          actions: [
+            { emoji: '🔗', label: 'Study Groups', command: '/studygroup' },
+            { emoji: '➕', label: 'Create Group', command: '/creategroup' },
+            { emoji: '🔍', label: 'Find Groups', command: '/findgroups' }
+          ]
+        },
+        {
+          name: 'Schedule & Events',
+          emoji: '📅',
+          actions: [
+            { emoji: '➕', label: 'Add Event', command: '/addevent' },
+            { emoji: '📆', label: 'My Events', command: '/events' },
+            { emoji: '⏰', label: 'Countdowns', command: '/countdown' }
+          ]
+        }
+      ]
+    }
+  },
+
+  // ===== CAREER TOOLS SECTION =====
+  career: {
+    main: {
+      title: '💼 *Career Tools*',
+      subtitle: 'Professional Development Suite',
+      sections: [
+        {
+          name: 'CV & Resume',
+          emoji: '📄',
+          actions: [
+            { emoji: '🔍', label: 'Analyze CV', command: '/analyze' },
+            { emoji: '✨', label: 'Improve CV', command: '/improve' },
+            { emoji: '📊', label: 'ATS Score', command: '/score' }
+          ]
+        },
+        {
+          name: 'Job Applications',
+          emoji: '💼',
+          actions: [
+            { emoji: '✉️', label: 'Cover Letter', command: '/cover' },
+            { emoji: '🎯', label: 'Job Match', command: '/jobmatch' }
+          ]
+        },
+        {
+          name: 'Skills Development',
+          emoji: '🎓',
+          actions: [
+            { emoji: '📚', label: 'Find Courses', command: '/courses' },
+            { emoji: '🎥', label: 'Webinars', command: '/webinars' },
+            { emoji: '🔧', label: 'Learn Skills', command: '/skills' },
+            { emoji: '📖', label: 'My Learning', command: '/mycourses' }
+          ]
+        },
+        {
+          name: 'Documents',
+          emoji: '📂',
+          actions: [
+            { emoji: '🔮', label: 'Analyze Document', command: '/analyze' },
+            { emoji: '📑', label: 'Generate Report', command: '/report' }
+          ]
+        }
+      ]
+    }
+  },
+
+  // ===== CRYPTO TRADING SECTION =====
+  crypto: {
+    main: {
+      title: '💰 *Crypto Trading Hub*',
+      subtitle: 'Track, Trade & Profit',
+      sections: [
+        {
+          name: 'Market Data',
+          emoji: '📊',
+          actions: [
+            { emoji: '💎', label: 'Crypto Prices', command: '/crypto' },
+            { emoji: '📰', label: 'Crypto News', command: '/cryptonews' },
+            { emoji: '📈', label: 'Market Trends', command: '/trends' }
+          ]
+        },
+        {
+          name: 'Trading',
+          emoji: '💹',
+          actions: [
+            { emoji: '🟢', label: 'Buy Crypto', command: '/buy' },
+            { emoji: '🔴', label: 'Sell Crypto', command: '/sell' },
+            { emoji: '💼', label: 'My Portfolio', command: '/inventory' }
+          ]
+        },
+        {
+          name: 'Alerts & Tracking',
+          emoji: '🔔',
+          actions: [
+            { emoji: '⏰', label: 'Price Alerts', command: '/cryptoalert' },
+            { emoji: '⭐', label: 'Watchlist', command: '/watchlist' },
+            { emoji: '📊', label: 'Analytics', command: '/cryptostats' }
+          ]
+        }
+      ]
+    }
+  },
+
+  // ===== QUICK ACTIONS SECTION =====
+  quick: {
+    main: {
+      title: '🎯 *Quick Actions*',
+      subtitle: 'Fast Access to Popular Features',
+      actions: [
+        { emoji: '🔎', label: 'Quick Search', command: '/search' },
+        { emoji: '🍕', label: 'Order Food', command: '/food' },
+        { emoji: '📚', label: 'Study Now', command: '/study' },
+        { emoji: '💼', label: 'Check CV', command: '/analyze' },
+        { emoji: '💰', label: 'Crypto Price', command: '/crypto' },
+        { emoji: '📝', label: 'Take Notes', command: '/notes' },
+        { emoji: '⏱️', label: 'Start Timer', command: '/timer' },
+        { emoji: '🔔', label: 'My Alerts', command: '/alerts' }
+      ]
+    }
+  },
+
+  // ===== STATUS & FEEDBACK MESSAGES =====
+  messages: {
+    welcome: {
+      emoji: '👋',
+      greeting: 'Hello {name}!',
+      tagline: 'Your AI-Powered Super Assistant'
+    },
+    success: {
+      emoji: '✅',
+      prefix: 'Success!'
+    },
+    error: {
+      emoji: '⚠️',
+      prefix: 'Oops!'
+    },
+    loading: {
+      emoji: '⏳',
+      prefix: 'Processing...'
+    },
+    info: {
+      emoji: 'ℹ️',
+      prefix: 'Info'
+    },
+    tip: {
+      emoji: '💡',
+      prefix: 'Tip'
+    }
+  },
+
+  // ===== INLINE KEYBOARD BUTTONS =====
+  buttons: {
+    back: { text: '🔙 Back', callback_data: 'back' },
+    home: { text: '🏠 Home', callback_data: 'main_menu' },
+    cancel: { text: '❌ Cancel', callback_data: 'cancel' },
+    confirm: { text: '✅ Confirm', callback_data: 'confirm' },
+    next: { text: '➡️ Next', callback_data: 'next' },
+    previous: { text: '⬅️ Previous', callback_data: 'previous' },
+    refresh: { text: '🔄 Refresh', callback_data: 'refresh' },
+    settings: { text: '⚙️ Settings', callback_data: 'settings' },
+    help: { text: '💡 Help', callback_data: 'help' }
+  },
+
+  // ===== RATING SYSTEM =====
+  rating: {
+    stars: ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
+    emoji: {
+      1: '😞',
+      2: '😐',
+      3: '🙂',
+      4: '😊',
+      5: '🤩'
+    }
+  },
+
+  // ===== PAYMENT & PRICING =====
+  payment: {
+    currency: '💵',
+    card: '💳',
+    cash: '💵',
+    online: '🌐',
+    mobile: '📱'
+  },
+
+  // ===== LOCATION & DELIVERY =====
+  location: {
+    pin: '📍',
+    map: '🗺️',
+    distance: '📏',
+    delivery: '🚗',
+    pickup: '🏬',
+    address: '🏠'
+  },
+
+  // ===== TIME & SCHEDULE =====
+  time: {
+    clock: '🕐',
+    timer: '⏱️',
+    alarm: '⏰',
+    calendar: '📅',
+    date: '📆',
+    countdown: '⏳'
+  },
+
+  // ===== USER ACTIONS =====
+  actions: {
+    add: '➕',
+    remove: '➖',
+    edit: '✏️',
+    delete: '🗑️',
+    share: '📤',
+    save: '💾',
+    copy: '📋',
+    print: '🖨️',
+    download: '⬇️',
+    upload: '⬆️',
+    search: '🔎',
+    filter: '🔍',
+    sort: '🔢',
+    view: '👁️'
+  },
+
+  // ===== NOTIFICATIONS =====
+  notifications: {
+    bell: '🔔',
+    new: '🆕',
+    hot: '🔥',
+    trending: '📈',
+    alert: '⚠️',
+    update: '🔄',
+    message: '💬',
+    email: '📧'
+  }
+};
+
+// Export for use in bot
+module.exports = ModernUX;

@@ -21,6 +21,7 @@ const EventManager = require('./services/EventManager');
 const CourseService = require('./services/CourseService');
 const FoodOrderService = require('./services/FoodOrderService');
 const BusinessService = require('./services/BusinessService');
+const InterfaceManager = require('./config/InterfaceManager');
 
 class TelegramDocumentBot {
   constructor() {
@@ -1000,7 +1001,38 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     const chatId = msg.chat.id;
     const text = msg.text.toLowerCase();
     
-    // Handle keyboard button presses
+    // Handle keyboard button presses - New Modern UX
+    if (text.includes('marketplace')) {
+      await this.showMarketplaceMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('food delivery')) {
+      await this.showFoodDeliveryMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('study hub')) {
+      await this.showStudyHubMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('career tools')) {
+      await this.showCareerToolsMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('crypto trading')) {
+      await this.showCryptoTradingMenu(chatId);
+      return;
+    }
+    
+    if (text.includes('quick actions')) {
+      await this.showQuickActionsMenu(chatId);
+      return;
+    }
+    
+    // Legacy handlers for backwards compatibility
     if (text.includes('cv tools')) {
       await this.showCVToolsMenu(chatId);
       return;
