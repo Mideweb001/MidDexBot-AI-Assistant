@@ -4974,55 +4974,67 @@ Send documents, ask questions, or use commands to get started!
   // === MAIN MENU SYSTEM ===
 
   getMainMenuKeyboard() {
-    return {
-      keyboard: [
-        ['🍽️ Food Hub', '� My Orders'],
-        ['🏪 Restaurants', '�💎 CV Tools'],
-        ['🧠 Study Assistant', '🔍 Research'],
-        ['📝 Smart Notes', '📚 Homework Help'],
-        ['⏰ Study Timer', '📅 Events & Deadlines'],
-        ['🎓 Skills & Courses', '💰 Crypto Dashboard'],
-        ['👥 Study Groups', '🔮 Analyze Document'],
-        ['✨ Help & Commands']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    };
+    return InterfaceManager.getMainMenuKeyboard();
   }
 
   async showMainMenu(chatId) {
     const user = await this.databaseService.getUserByTelegramId(chatId);
     const firstName = user ? user.first_name : 'there';
     
-    let message = `🏠 *Main Menu*\n\n`;
-    message += `Hello ${firstName}! 👋\n\n`;
-    message += `🤖 *Your AI Study & Document Assistant*\n\n`;
-    message += `� **Business Marketplace** 🆕\n`;
-    message += `• **Search** - Find local businesses\n`;
-    message += `• **Order** - Shop from businesses\n`;
-    message += `• **Register** - List your business\n`;
-    message += `• **My Orders** - Track marketplace orders\n\n`;
-    message += `�🍽️ **Food Delivery & Ordering** 🎯\n`;
-    message += `• **Food Hub** - Your ordering dashboard\n`;
-    message += `• **My Orders** - Track all your orders\n`;
-    message += `• **Restaurants** - Browse nearby options\n\n`;
-    message += `📚 **Academic Tools**\n`;
-    message += `• Study Assistant & Smart Notes\n`;
-    message += `• Homework Help & Timer\n`;
-    message += `• Events & Course Management\n\n`;
-    message += `💼 **Professional Tools**\n`;
-    message += `• CV Analysis & Improvement\n`;
-    message += `• Document Analysis & Research\n\n`;
-    message += `💰 **Trading & Finance**\n`;
-    message += `• Crypto Dashboard & Alerts\n`;
-    message += `• Portfolio Tracking\n\n`;
-    message += `👥 **Collaboration**\n`;
-    message += `• Study Groups & Communities\n\n`;
-    message += `⚡ **Quick Commands:** /search, /register_business, /my_orders, /help`;
+    const message = InterfaceManager.getMainMenuMessage(firstName);
 
     await this.bot.sendMessage(chatId, message, {
       parse_mode: 'Markdown',
       reply_markup: this.getMainMenuKeyboard()
+    });
+  }
+
+  // Category-specific menu handlers
+  async showMarketplaceMenu(chatId) {
+    const message = InterfaceManager.getMarketplaceMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('marketplace')
+    });
+  }
+
+  async showFoodDeliveryMenu(chatId) {
+    const message = InterfaceManager.getFoodDeliveryMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('food')
+    });
+  }
+
+  async showStudyHubMenu(chatId) {
+    const message = InterfaceManager.getStudyHubMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('study')
+    });
+  }
+
+  async showCareerToolsMenu(chatId) {
+    const message = InterfaceManager.getCareerToolsMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('career')
+    });
+  }
+
+  async showCryptoTradingMenu(chatId) {
+    const message = InterfaceManager.getCryptoTradingMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('crypto')
+    });
+  }
+
+  async showQuickActionsMenu(chatId) {
+    const message = InterfaceManager.getQuickActionsMenu();
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: InterfaceManager.getSectionKeyboard('quick')
     });
   }
 
