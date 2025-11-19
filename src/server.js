@@ -3592,7 +3592,7 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
         
         try {
           // Delete any existing webhook first
-          await this.bot.deleteWebhook({ drop_pending_updates: true });
+          await this.bot.deleteWebHook({ drop_pending_updates: true });
           console.log('🗑️  Cleared old webhook and pending updates');
           
           // Set new webhook with optimal configuration
