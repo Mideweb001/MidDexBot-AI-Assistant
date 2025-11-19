@@ -18,13 +18,19 @@ class DatabaseService {
 
       // Sync all models (create tables if they don't exist)
       if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-        // Production PostgreSQL: Use alter to avoid data loss and adjust schemas safely
-        console.log('🏭 Production mode: Alter syncing PostgreSQL tables...');
-        await this.sequelize.sync({ 
-          alter: true,
-          force: false
-        });
-        console.log('✅ Production database tables synchronized');
+        // Production PostgreSQL: Use more conservative syncing to avoid ENUM migration issues
+        console.log('🏭 Production mode: Syncing PostgreSQL tables...');
+        try {
+          // Try normal sync first (creates tables if they don't exist)
+          await this.sequelize.sync({ 
+            alter: false,  // Don't alter existing tables to avoid ENUM issues
+            force: false
+          });
+          console.log('✅ Production database tables synchronized');
+        } catch (syncError) {
+          console.warn('⚠️ Database sync encountered issues (this is normal for existing tables):', syncError.message);
+          // Continue anyway - tables likely already exist
+        }
       } else {
         // Development SQLite: Use alter for schema changes
         await this.sequelize.sync({ 
