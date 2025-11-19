@@ -5323,7 +5323,6 @@ Send documents, ask questions, or use commands to get started!
     const message = InterfaceManager.getMainMenuMessage(firstName);
 
     await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
       reply_markup: this.getMainMenuKeyboard()
     });
   }

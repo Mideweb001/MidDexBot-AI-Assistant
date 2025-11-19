@@ -11,21 +11,23 @@ class InterfaceManager {
    * Generate main menu message with modern layout
    */
   static getMainMenuMessage(firstName = 'there') {
-    const { welcome, categories } = ModernUX;
+    const { messages, categories } = ModernUX;
+    const { welcome } = messages;
     
-    let message = `${welcome.emoji} *${welcome.greeting.replace('{name}', firstName)}*\n`;
-    message += `✨ _${welcome.tagline}_\n\n`;
+    let message = `👋 Hello ${firstName}!\n`;
+    message += `✨ Your AI-Powered Super Assistant\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
-    message += `🛍️ *Marketplace* - Shop local businesses\n`;
-    message += `🍽️ *Food Delivery* - Order delicious meals\n`;
-    message += `📚 *Study Hub* - AI-powered learning\n`;
-    message += `💼 *Career Tools* - Professional growth\n`;
-    message += `💰 *Crypto Trading* - Track & trade\n`;
-    message += `🎯 *Quick Actions* - Fast access\n\n`;
+    message += `🛍️ Marketplace - Shop local businesses\n`;
+    message += `🍽️ Food Delivery - Order delicious meals\n`;
+    message += `📚 Study Hub - AI-powered learning\n`;
+    message += `💼 Career Tools - Professional growth\n`;
+    message += `💰 Crypto Trading - Track and trade\n`;
+    message += `🎯 Quick Actions - Fast access\n`;
+    message += `🏨 Hotels - Book amazing stays\n\n`;
     
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-    message += `💡 _Tap a button below to get started_`;
+    message += `💡 Tap a button below to get started`;
     
     return message;
   }
@@ -63,12 +65,12 @@ class InterfaceManager {
     const { marketplace } = ModernUX;
     
     let message = `${marketplace.main.title}\n`;
-    message += `_${marketplace.main.subtitle}_\n\n`;
+    message += `${marketplace.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     marketplace.main.actions.forEach(action => {
       message += `${action.emoji} *${action.label}*\n`;
-      message += `   _${action.command}_\n\n`;
+      message += `   ${action.command}\n\n`;
     });
     
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -89,12 +91,12 @@ class InterfaceManager {
     const { food } = ModernUX;
     
     let message = `${food.main.title}\n`;
-    message += `_${food.main.subtitle}_\n\n`;
+    message += `${food.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     food.main.actions.forEach(action => {
       message += `${action.emoji} *${action.label}*\n`;
-      message += `   _${action.command}_\n\n`;
+      message += `   ${action.command}\n\n`;
     });
     
     return message;
@@ -107,7 +109,7 @@ class InterfaceManager {
     const { study } = ModernUX;
     
     let message = `${study.main.title}\n`;
-    message += `_${study.main.subtitle}_\n\n`;
+    message += `${study.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     study.main.sections.forEach(section => {
@@ -128,7 +130,7 @@ class InterfaceManager {
     const { career } = ModernUX;
     
     let message = `${career.main.title}\n`;
-    message += `_${career.main.subtitle}_\n\n`;
+    message += `${career.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     career.main.sections.forEach(section => {
@@ -149,7 +151,7 @@ class InterfaceManager {
     const { crypto } = ModernUX;
     
     let message = `${crypto.main.title}\n`;
-    message += `_${crypto.main.subtitle}_\n\n`;
+    message += `${crypto.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     crypto.main.sections.forEach(section => {
@@ -170,7 +172,7 @@ class InterfaceManager {
     const { quick } = ModernUX;
     
     let message = `${quick.main.title}\n`;
-    message += `_${quick.main.subtitle}_\n\n`;
+    message += `${quick.main.subtitle}\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     quick.main.actions.forEach((action, index) => {
@@ -187,8 +189,8 @@ class InterfaceManager {
   static getHotelsMenu() {
     const { hotels } = ModernUX;
     
-    let message = `${hotels.main.title}\n`;
-    message += `_${hotels.main.subtitle}_\n\n`;
+    let message = `🏨 *Hotel Booking*\n`;
+    message += `Find & Book Amazing Stays\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     hotels.main.actions.forEach((action, index) => {
@@ -197,9 +199,9 @@ class InterfaceManager {
     
     message += `\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     message += `🌍 *Coverage*\n`;
-    message += `✓ All 36 Nigerian States + FCT\n`;
-    message += `✓ African Hotels\n`;
-    message += `✓ Verified Properties\n`;
+    message += `• All 36 Nigerian States + FCT\n`;
+    message += `• African Hotels\n`;
+    message += `• Verified Properties\n`;
     
     return message;
   }
