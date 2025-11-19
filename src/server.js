@@ -3568,44 +3568,84 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
 
   async start() {
     try {
-      // Try to initialize database, but continue if it fails
+      // Initialize database
       try {
         await this.databaseService.initialize();
         console.log('✅ Database ready for use');
       } catch (dbError) {
         console.warn('⚠️ Database initialization failed, continuing without persistence:', dbError.message);
-        // Continue without database - bot will work but won't save data
       }
       
       // Register all bot commands for menu button
       await this.registerBotCommands();
+      console.log('✅ Bot commands registered successfully (44 commands)');
       
       // Start crypto alert monitoring
       console.log('🚀 Starting crypto alert monitoring...');
       this.cryptoAlertMonitor.start();
+      console.log('✅ CryptoAlertMonitor started - checking alerts every 2 minutes');
       
-      // Configure webhook for production
+      // Configure webhook for production or polling for development
       if (this.isProduction && this.webhookUrl) {
-        console.log('🔗 Setting up webhook for production...');
+        console.log('🌐 Configuring PRODUCTION mode with webhooks...');
         const fullWebhook = `${this.webhookUrl}/webhook`;
+        
         try {
-          const setResult = await this.bot.setWebHook(fullWebhook);
-          console.log(`✅ Webhook set to: ${fullWebhook}`, setResult);
+          // Delete any existing webhook first
+          await this.bot.deleteWebhook({ drop_pending_updates: true });
+          console.log('🗑️  Cleared old webhook and pending updates');
           
-          // Verify webhook was set
+          // Set new webhook with optimal configuration
+          await this.bot.setWebHook(fullWebhook, {
+            drop_pending_updates: true,
+            max_connections: 100,
+            allowed_updates: [
+              'message',
+              'callback_query',
+              'inline_query',
+              'chosen_inline_result',
+              'shipping_query',
+              'pre_checkout_query'
+            ]
+          });
+          console.log(`✅ Webhook set successfully: ${fullWebhook}`);
+          
+          // Verify webhook was set correctly
           const webhookInfo = await this.bot.getWebHookInfo();
-          console.log(`📡 Webhook verification:`, {
+          console.log(`� Webhook Info:`, {
             url: webhookInfo.url,
             has_custom_certificate: webhookInfo.has_custom_certificate,
             pending_update_count: webhookInfo.pending_update_count,
-            last_error_date: webhookInfo.last_error_date,
-            last_error_message: webhookInfo.last_error_message
+            last_error_date: webhookInfo.last_error_date || 'none',
+            last_error_message: webhookInfo.last_error_message || 'none'
           });
+          
+          if (webhookInfo.last_error_message) {
+            console.warn('⚠️  Previous webhook error detected:', webhookInfo.last_error_message);
+          }
+          
+          console.log('🌐 Bot running in PRODUCTION mode with webhooks');
         } catch (whError) {
           console.error('❌ Failed to set webhook:', whError.message);
+          throw whError;
         }
       } else {
-        console.log('🔄 Running in development mode with polling');
+        // Development mode - use polling
+        console.log('🔄 Running in DEVELOPMENT mode with polling');
+        console.log('📡 Starting polling...');
+        
+        await this.bot.startPolling({
+          restart: true,
+          polling: {
+            interval: 300,
+            autoStart: true,
+            params: {
+              timeout: 10
+            }
+          }
+        });
+        
+        console.log('✅ Polling started successfully');
       }
       
       // Start express server
@@ -3614,7 +3654,10 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
         console.log(`💎 Bot is active and listening for messages`);
         console.log(`🌟 Health check: http://localhost:${this.port}/health`);
         if (this.isProduction && this.webhookUrl) {
-          console.log(`🔗 Webhook endpoint configured: ${this.webhookUrl}/webhook`);
+          console.log(`🔗 Webhook endpoint: ${this.webhookUrl}/webhook`);
+          console.log(`🚀 Bot is LIVE in production!`);
+        } else {
+          console.log(`💻 Bot is running locally on localhost:${this.port}`);
         }
       });
 
