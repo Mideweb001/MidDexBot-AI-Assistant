@@ -21,7 +21,6 @@ const EventManager = require('./services/EventManager');
 const CourseService = require('./services/CourseService');
 const FoodOrderService = require('./services/FoodOrderService');
 const BusinessService = require('./services/BusinessService');
-const HotelService = require('./services/HotelService');
 const InterfaceManager = require('./config/InterfaceManager');
 
 class TelegramDocumentBot {
@@ -73,9 +72,6 @@ class TelegramDocumentBot {
     
     // Initialize course service
     this.courseService = new CourseService(this.databaseService);
-    
-    // Initialize hotel service
-    this.hotelService = new HotelService(this.databaseService);
     
     // Database storage handles document persistence
     
@@ -534,12 +530,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showMainMenu(chatId);
     });
 
-    // Hotel booking menu command
-    this.bot.onText(/\/hotels/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showHotelsMenu(chatId);
-    });
-
     // === STUDY GROUP COMMANDS ===
     
     // Main study groups command
@@ -763,75 +753,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     this.bot.onText(/\/myorders/, async (msg) => {
       const chatId = msg.chat.id;
       await this.showMyOrders(chatId);
-    });
-
-    // ===== HOTEL BOOKING COMMANDS =====
-    
-    // Hotel registration command
-    this.bot.onText(/\/register_hotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.startHotelRegistration(chatId);
-    });
-
-    // Search hotels command
-    this.bot.onText(/\/search_hotels(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const location = match && match[1] ? match[1].trim() : null;
-      await this.searchHotels(chatId, location);
-    });
-
-    // Book hotel command
-    this.bot.onText(/\/book_hotel(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const hotelId = match && match[1] ? match[1].trim() : null;
-      await this.startHotelBooking(chatId, hotelId);
-    });
-
-    // View my hotel bookings
-    this.bot.onText(/\/my_bookings/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showMyHotelBookings(chatId);
-    });
-
-    // Manage hotels (for hotel owners)
-    this.bot.onText(/\/manage_hotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showHotelManagement(chatId);
-    });
-
-    // Review hotel command
-    this.bot.onText(/\/review_hotel(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const bookingId = match && match[1] ? match[1].trim() : null;
-      await this.startHotelReview(chatId, bookingId);
-    });
-
-    // Alternative command formats
-    this.bot.onText(/\/registerhotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.startHotelRegistration(chatId);
-    });
-
-    this.bot.onText(/\/searchhotels(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const location = match && match[1] ? match[1].trim() : null;
-      await this.searchHotels(chatId, location);
-    });
-
-    this.bot.onText(/\/bookhotel(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const hotelId = match && match[1] ? match[1].trim() : null;
-      await this.startHotelBooking(chatId, hotelId);
-    });
-
-    this.bot.onText(/\/mybookings/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showMyHotelBookings(chatId);
-    });
-
-    this.bot.onText(/\/managehotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showHotelManagement(chatId);
     });
 
     // Business Marketplace commands
@@ -1108,11 +1029,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     
     if (text.includes('quick actions')) {
       await this.showQuickActionsMenu(chatId);
-      return;
-    }
-    
-    if (text.includes('hotels') || text.includes('hotel booking')) {
-      await this.showHotelsMenu(chatId);
       return;
     }
     
@@ -1493,20 +1409,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.bot.sendMessage(chatId, '⏰ **Study Timer**\n\nHow many minutes would you like to study?\n\nRecommended sessions:\n• 25 minutes (Pomodoro)\n• 45 minutes (Deep focus)\n• 90 minutes (Learning session)\n\nExample: /timer 25');
         break;
 
-      case 'research_tool':
-        await this.bot.sendMessage(chatId, '🔍 *Research Assistant*\n\nWhat topic would you like me to research?\n\nExample: "artificial intelligence in education" or "renewable energy sources"', {
-          parse_mode: 'Markdown',
-          reply_markup: { force_reply: true }
-        });
-        break;
-
-      case 'smart_notes':
-        await this.bot.sendMessage(chatId, '📝 *Smart Notes Creator*\n\nSend me content to convert into organized study notes!\n\nYou can:\n• Paste text directly\n• Send a topic to generate notes about\n• Upload a document', {
-          parse_mode: 'Markdown',
-          reply_markup: { force_reply: true }
-        });
-        break;
-
       case 'research_to_notes':
         if (lastDoc && lastDoc.analysis) {
           await this.bot.sendMessage(chatId, '📝 Converting research to smart notes...');
@@ -1637,24 +1539,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
           });
         } else if (data === 'inventory_history') {
           await this.showTransactionHistory(chatId);
-        }
-        // === HOTEL BOOKING CALLBACK HANDLERS ===
-        else if (data === 'search_hotels') {
-          await this.bot.sendMessage(chatId, 
-            '🔍 *Search Hotels*\n\n' +
-            'Please send me a location to search for hotels.\n\n' +
-            'Example: Lagos, Abuja, Port Harcourt\n\n' +
-            'Or use: /search_hotels <location>',
-            { parse_mode: 'Markdown' }
-          );
-        } else if (data === 'my_bookings') {
-          await this.showMyHotelBookings(chatId);
-        } else if (data === 'write_review') {
-          await this.startHotelReview(chatId, null);
-        } else if (data === 'register_hotel') {
-          await this.startHotelRegistration(chatId);
-        } else if (data === 'manage_hotels') {
-          await this.showHotelManagement(chatId);
         }
         // Handle dynamic study group callbacks
         else if (data.startsWith('sg_join_')) {
@@ -5076,75 +4960,55 @@ Send documents, ask questions, or use commands to get started!
   // === MAIN MENU SYSTEM ===
 
   getMainMenuKeyboard() {
-    return InterfaceManager.getMainMenuKeyboard();
+    return {
+      keyboard: [
+        ['🍽️ Food Hub', '� My Orders'],
+        ['🏪 Restaurants', '�💎 CV Tools'],
+        ['🧠 Study Assistant', '🔍 Research'],
+        ['📝 Smart Notes', '📚 Homework Help'],
+        ['⏰ Study Timer', '📅 Events & Deadlines'],
+        ['🎓 Skills & Courses', '💰 Crypto Dashboard'],
+        ['👥 Study Groups', '🔮 Analyze Document'],
+        ['✨ Help & Commands']
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    };
   }
 
   async showMainMenu(chatId) {
     const user = await this.databaseService.getUserByTelegramId(chatId);
     const firstName = user ? user.first_name : 'there';
     
-    const message = InterfaceManager.getMainMenuMessage(firstName);
+    let message = `🏠 *Main Menu*\n\n`;
+    message += `Hello ${firstName}! 👋\n\n`;
+    message += `🤖 *Your AI Study & Document Assistant*\n\n`;
+    message += `� **Business Marketplace** 🆕\n`;
+    message += `• **Search** - Find local businesses\n`;
+    message += `• **Order** - Shop from businesses\n`;
+    message += `• **Register** - List your business\n`;
+    message += `• **My Orders** - Track marketplace orders\n\n`;
+    message += `�🍽️ **Food Delivery & Ordering** 🎯\n`;
+    message += `• **Food Hub** - Your ordering dashboard\n`;
+    message += `• **My Orders** - Track all your orders\n`;
+    message += `• **Restaurants** - Browse nearby options\n\n`;
+    message += `📚 **Academic Tools**\n`;
+    message += `• Study Assistant & Smart Notes\n`;
+    message += `• Homework Help & Timer\n`;
+    message += `• Events & Course Management\n\n`;
+    message += `💼 **Professional Tools**\n`;
+    message += `• CV Analysis & Improvement\n`;
+    message += `• Document Analysis & Research\n\n`;
+    message += `💰 **Trading & Finance**\n`;
+    message += `• Crypto Dashboard & Alerts\n`;
+    message += `• Portfolio Tracking\n\n`;
+    message += `👥 **Collaboration**\n`;
+    message += `• Study Groups & Communities\n\n`;
+    message += `⚡ **Quick Commands:** /search, /register_business, /my_orders, /help`;
 
     await this.bot.sendMessage(chatId, message, {
       parse_mode: 'Markdown',
       reply_markup: this.getMainMenuKeyboard()
-    });
-  }
-
-  // Category-specific menu handlers
-  async showMarketplaceMenu(chatId) {
-    const message = InterfaceManager.getMarketplaceMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('marketplace')
-    });
-  }
-
-  async showFoodDeliveryMenu(chatId) {
-    const message = InterfaceManager.getFoodDeliveryMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('food')
-    });
-  }
-
-  async showStudyHubMenu(chatId) {
-    const message = InterfaceManager.getStudyHubMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('study')
-    });
-  }
-
-  async showCareerToolsMenu(chatId) {
-    const message = InterfaceManager.getCareerToolsMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('career')
-    });
-  }
-
-  async showCryptoTradingMenu(chatId) {
-    const message = InterfaceManager.getCryptoTradingMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('crypto')
-    });
-  }
-
-  async showQuickActionsMenu(chatId) {
-    const message = InterfaceManager.getQuickActionsMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('quick')
-    });
-  }
-
-  async showHotelsMenu(chatId) {
-    const message = InterfaceManager.getHotelsMenu();
-    await this.bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('hotels')
     });
   }
 

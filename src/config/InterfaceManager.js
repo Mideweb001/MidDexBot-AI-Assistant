@@ -172,6 +172,29 @@ class InterfaceManager {
   }
 
   /**
+   * Generate hotel booking menu
+   */
+  static getHotelsMenu() {
+    const { hotels } = ModernUX;
+    
+    let message = `${hotels.main.title}\n`;
+    message += `_${hotels.main.subtitle}_\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    hotels.main.actions.forEach((action, index) => {
+      message += `${action.emoji} *${action.label}* - ${action.command}\n`;
+    });
+    
+    message += `\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `🌍 *Coverage*\n`;
+    message += `✓ All 36 Nigerian States + FCT\n`;
+    message += `✓ African Hotels\n`;
+    message += `✓ Verified Properties\n`;
+    
+    return message;
+  }
+
+  /**
    * Generate inline keyboard for section navigation
    */
   static getSectionKeyboard(section) {
@@ -251,6 +274,21 @@ class InterfaceManager {
         [
           { text: '💼 Portfolio', callback_data: 'crypto_portfolio' },
           { text: '⏰ Alerts', callback_data: 'crypto_alerts' }
+        ],
+        [buttons.home]
+      ];
+    } else if (section === 'hotels') {
+      keyboard.inline_keyboard = [
+        [
+          { text: '🔍 Search Hotels', callback_data: 'search_hotels' },
+          { text: '📋 My Bookings', callback_data: 'my_bookings' }
+        ],
+        [
+          { text: '⭐ Write Review', callback_data: 'write_review' },
+          { text: '🏢 Register Hotel', callback_data: 'register_hotel' }
+        ],
+        [
+          { text: '💼 Manage Hotels', callback_data: 'manage_hotels' }
         ],
         [buttons.home]
       ];

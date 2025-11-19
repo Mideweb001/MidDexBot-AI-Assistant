@@ -239,19 +239,56 @@ const ModernUX = {
   // ===== QUICK ACTIONS SECTION =====
   quick: {
     main: {
-      title: '🎯 *Quick Actions*',
-      subtitle: 'Fast Access to Popular Features',
+      title: '⚡ *Quick Actions*',
+      subtitle: 'Fast Access to Key Features',
       actions: [
-        { emoji: '🔎', label: 'Quick Search', command: '/search' },
-        { emoji: '🍕', label: 'Order Food', command: '/food' },
-        { emoji: '📚', label: 'Study Now', command: '/study' },
-        { emoji: '💼', label: 'Check CV', command: '/analyze' },
-        { emoji: '💰', label: 'Crypto Price', command: '/crypto' },
+        { emoji: '🤖', label: 'AI Chat', command: '/start' },
+        { emoji: '�', label: 'Hotels', command: '/hotels' },
+        { emoji: '📄', label: 'Analyze Document', command: '/analyze' },
         { emoji: '📝', label: 'Take Notes', command: '/notes' },
         { emoji: '⏱️', label: 'Start Timer', command: '/timer' },
         { emoji: '🔔', label: 'My Alerts', command: '/alerts' }
       ]
     }
+  },
+
+  // ===== HOTEL BOOKING SECTION =====
+  hotels: {
+    main: {
+      title: '🏨 *Hotel Booking*',
+      subtitle: 'Find & Book Amazing Stays',
+      actions: [
+        { emoji: '�', label: 'Search Hotels', command: '/search_hotels' },
+        { emoji: '📋', label: 'My Bookings', command: '/my_bookings' },
+        { emoji: '⭐', label: 'Write Review', command: '/review_hotel' },
+        { emoji: '🏢', label: 'Register Hotel', command: '/register_hotel' },
+        { emoji: '�', label: 'Manage Hotels', command: '/manage_hotel' }
+      ]
+    },
+    statuses: {
+      pending: { emoji: '⏳', label: 'Pending' },
+      confirmed: { emoji: '✅', label: 'Confirmed' },
+      checked_in: { emoji: '🏨', label: 'Checked In' },
+      checked_out: { emoji: '✨', label: 'Checked Out' },
+      cancelled: { emoji: '❌', label: 'Cancelled' },
+      no_show: { emoji: '⚠️', label: 'No Show' }
+    },
+    amenities: [
+      { emoji: '📶', name: 'WiFi' },
+      { emoji: '🍳', name: 'Breakfast' },
+      { emoji: '🏊', name: 'Pool' },
+      { emoji: '💪', name: 'Gym' },
+      { emoji: '🚗', name: 'Parking' },
+      { emoji: '🍽️', name: 'Restaurant' },
+      { emoji: '🍺', name: 'Bar' },
+      { emoji: '💆', name: 'Spa' },
+      { emoji: '✈️', name: 'Airport Shuttle' },
+      { emoji: '🐾', name: 'Pet Friendly' },
+      { emoji: '🧺', name: 'Laundry' },
+      { emoji: '❄️', name: 'Air Conditioning' },
+      { emoji: '🛎️', name: 'Room Service' },
+      { emoji: '👔', name: 'Conference Room' }
+    ]
   },
 
   // ===== STATUS & FEEDBACK MESSAGES =====

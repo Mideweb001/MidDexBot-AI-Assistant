@@ -60,6 +60,11 @@ const OrderItem = require('./OrderItem')(sequelize);
 const Business = require('./Business')(sequelize);
 const Order = require('./Order')(sequelize);
 
+// Hotel booking models
+const Hotel = require('./Hotel')(sequelize);
+const HotelBooking = require('./HotelBooking')(sequelize);
+const HotelReview = require('./HotelReview')(sequelize);
+
 // Define associations (constraints: false to prevent automatic FK references)
 User.hasMany(Document, { foreignKey: 'user_id', as: 'documents', constraints: false });
 Document.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
@@ -179,6 +184,25 @@ Order.belongsTo(User, { foreignKey: 'customer_id', as: 'customer', constraints: 
 Business.hasMany(Order, { foreignKey: 'business_id', as: 'businessOrders', constraints: false });
 Order.belongsTo(Business, { foreignKey: 'business_id', as: 'business', constraints: false });
 
+// Hotel associations
+User.hasMany(Hotel, { foreignKey: 'owner_id', as: 'ownedHotels', constraints: false });
+Hotel.belongsTo(User, { foreignKey: 'owner_id', as: 'owner', constraints: false });
+
+User.hasMany(HotelBooking, { foreignKey: 'user_id', as: 'hotelBookings', constraints: false });
+HotelBooking.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
+
+Hotel.hasMany(HotelBooking, { foreignKey: 'hotel_id', as: 'bookings', constraints: false });
+HotelBooking.belongsTo(Hotel, { foreignKey: 'hotel_id', as: 'hotel', constraints: false });
+
+User.hasMany(HotelReview, { foreignKey: 'user_id', as: 'hotelReviews', constraints: false });
+HotelReview.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
+
+Hotel.hasMany(HotelReview, { foreignKey: 'hotel_id', as: 'reviews', constraints: false });
+HotelReview.belongsTo(Hotel, { foreignKey: 'hotel_id', as: 'hotel', constraints: false });
+
+HotelBooking.hasMany(HotelReview, { foreignKey: 'booking_id', as: 'reviews', constraints: false });
+HotelReview.belongsTo(HotelBooking, { foreignKey: 'booking_id', as: 'booking', constraints: false });
+
 module.exports = {
   sequelize,
   User,
@@ -200,5 +224,8 @@ module.exports = {
   FoodOrder,
   OrderItem,
   Business,
-  Order
+  Order,
+  Hotel,
+  HotelBooking,
+  HotelReview
 };
