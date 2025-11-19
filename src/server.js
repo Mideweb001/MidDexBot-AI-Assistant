@@ -173,6 +173,12 @@ class TelegramDocumentBot {
       await this.showMainMenu(chatId);
     });
 
+    // Menu command - same as start
+    this.bot.onText(/\/menu/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showMainMenu(chatId);
+    });
+
     // Research command
     this.bot.onText(/\/research (.+)/, async (msg, match) => {
       const chatId = msg.chat.id;
@@ -1530,7 +1536,159 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         break;
 
       case 'main_menu':
-        await this.sendWelcomeMessage(chatId);
+        await this.showMainMenu(chatId);
+        break;
+
+      // === MENU NAVIGATION CALLBACKS ===
+      case 'menu_marketplace':
+        await this.showMarketplaceMenu(chatId);
+        break;
+
+      case 'menu_food':
+        await this.showFoodDeliveryMenu(chatId);
+        break;
+
+      case 'menu_study':
+        await this.showStudyHubMenu(chatId);
+        break;
+
+      case 'menu_career':
+        await this.showCareerToolsMenu(chatId);
+        break;
+
+      case 'menu_crypto':
+        await this.showCryptoTradingMenu(chatId);
+        break;
+
+      case 'menu_quick':
+        await this.showQuickActionsMenu(chatId);
+        break;
+
+      case 'menu_hotels':
+        await this.showHotelsMenu(chatId);
+        break;
+
+      case 'show_help':
+        await this.showHelpMenu(chatId);
+        break;
+
+      // === MARKETPLACE CALLBACKS ===
+      case 'search_businesses':
+        await this.bot.sendMessage(chatId, '🔎 *Search Businesses*\n\nWhat type of business are you looking for?\n\nExample: "restaurant", "electronics shop", or send a location', { parse_mode: 'Markdown' });
+        break;
+
+      case 'my_business':
+        await this.bot.sendMessage(chatId, '🏬 *My Business*\n\nView and manage your registered businesses\n\nUse /mybusiness for full dashboard', { parse_mode: 'Markdown' });
+        break;
+
+      case 'my_orders':
+        await this.bot.sendMessage(chatId, '🛒 *My Orders*\n\nViewing your marketplace orders...\n\nUse /myorders for detailed history', { parse_mode: 'Markdown' });
+        break;
+
+      case 'register_business':
+        await this.bot.sendMessage(chatId, '➕ *Register Business*\n\nLet\'s get your business listed!\n\nUse /registerbusiness to start the registration process', { parse_mode: 'Markdown' });
+        break;
+
+      // === FOOD DELIVERY CALLBACKS ===
+      case 'browse_restaurants':
+        await this.bot.sendMessage(chatId, '🍕 *Browse Restaurants*\n\nUse /restaurants to see all available restaurants near you', { parse_mode: 'Markdown' });
+        break;
+
+      case 'start_food_order':
+        await this.bot.sendMessage(chatId, '🛒 *Start Food Order*\n\nUse /orderfood to begin placing your order', { parse_mode: 'Markdown' });
+        break;
+
+      case 'my_food_orders':
+        await this.bot.sendMessage(chatId, '📦 *My Food Orders*\n\nUse /orders to view your order history', { parse_mode: 'Markdown' });
+        break;
+
+      case 'register_restaurant':
+        await this.bot.sendMessage(chatId, '🏪 *Register Restaurant*\n\nUse /registerrestaurant to list your restaurant', { parse_mode: 'Markdown' });
+        break;
+
+      // === STUDY HUB CALLBACKS ===
+      case 'homework_help':
+        await this.showHomeworkMenu(chatId);
+        break;
+
+      case 'study_groups':
+        await this.bot.sendMessage(chatId, '👥 *Study Groups*\n\nUse /studygroup to access study groups dashboard', { parse_mode: 'Markdown' });
+        break;
+
+      case 'study_timer':
+        await this.bot.sendMessage(chatId, '⏱️ *Study Timer*\n\nHow many minutes would you like to study?\n\nExample: /timer 25', { parse_mode: 'Markdown' });
+        break;
+
+      case 'events_calendar':
+        await this.bot.sendMessage(chatId, '📅 *Events & Calendar*\n\nUse /events to view your upcoming events and deadlines', { parse_mode: 'Markdown' });
+        break;
+
+      // === CAREER TOOLS CALLBACKS ===
+      case 'analyze_cv':
+        await this.bot.sendMessage(chatId, '📄 *Analyze CV*\n\nUpload your CV (PDF, DOC, or TXT) and I\'ll analyze it for you', { parse_mode: 'Markdown' });
+        break;
+
+      case 'improve_cv':
+        if (lastDoc) {
+          await this.bot.sendMessage(chatId, '💎 Improving your CV...');
+          const improvement = await this.aiAnalyzer.improveCVContent(lastDoc.extracted_text);
+          await this.sendCVImprovement(chatId, improvement);
+        } else {
+          await this.bot.sendMessage(chatId, '✨ *Improve CV*\n\nUpload your CV first, then I can help improve it', { parse_mode: 'Markdown' });
+        }
+        break;
+
+      case 'ats_score':
+        if (lastDoc) {
+          await this.bot.sendMessage(chatId, '⭐ Analyzing ATS compatibility...');
+          const atsAnalysis = await this.generateATSAnalysis(lastDoc.extracted_text, lastDoc.ai_analysis);
+          await this.bot.sendMessage(chatId, atsAnalysis);
+        } else {
+          await this.bot.sendMessage(chatId, '📊 *ATS Score*\n\nUpload your CV to get an ATS compatibility score', { parse_mode: 'Markdown' });
+        }
+        break;
+
+      case 'cover_letter':
+        if (lastDoc) {
+          await this.bot.sendMessage(chatId, '🌟 Generating your cover letter...');
+          const coverLetter = await this.aiAnalyzer.generateCoverLetter(lastDoc.extracted_text);
+          await this.sendCoverLetter(chatId, coverLetter);
+        } else {
+          await this.bot.sendMessage(chatId, '✉️ *Cover Letter*\n\nUpload your CV first to generate a personalized cover letter', { parse_mode: 'Markdown' });
+        }
+        break;
+
+      case 'find_courses':
+        await this.showCourseCategoryMenu(chatId);
+        break;
+
+      case 'find_webinars':
+        await this.bot.sendMessage(chatId, '🎥 *Find Webinars*\n\nUse /webinars to discover educational webinars', { parse_mode: 'Markdown' });
+        break;
+
+      // === CRYPTO TRADING CALLBACKS ===
+      case 'crypto_prices':
+        await this.showCryptoMainMenu(chatId);
+        break;
+
+      case 'crypto_news':
+        await this.handleCryptoNews(chatId);
+        break;
+
+      case 'buy_crypto':
+        await this.bot.sendMessage(chatId, '🟢 *Buy Cryptocurrency*\n\nWhich cryptocurrency would you like to buy?\n\nExample: /buy bitcoin', { parse_mode: 'Markdown' });
+        break;
+
+      case 'sell_crypto':
+        await this.bot.sendMessage(chatId, '🔴 *Sell Cryptocurrency*\n\nWhich cryptocurrency would you like to sell?\n\nExample: /sell bitcoin', { parse_mode: 'Markdown' });
+        break;
+
+      case 'crypto_portfolio':
+        await this.showInventoryMenu(chatId);
+        break;
+
+      case 'crypto_alerts':
+        await this.showCryptoAlertMenu(chatId);
         break;
 
       case 'timeframe_intensive':
@@ -3419,6 +3577,9 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
         // Continue without database - bot will work but won't save data
       }
       
+      // Register all bot commands for menu button
+      await this.registerBotCommands();
+      
       // Start crypto alert monitoring
       console.log('🚀 Starting crypto alert monitoring...');
       this.cryptoAlertMonitor.start();
@@ -3463,6 +3624,82 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
     } catch (error) {
       console.error('❌ Failed to start MidDexBot:', error);
       process.exit(1);
+    }
+  }
+
+  /**
+   * Register all bot commands to appear in Telegram menu button
+   */
+  async registerBotCommands() {
+    try {
+      const commands = [
+        // Main Navigation
+        { command: 'start', description: '🏠 Main Menu & Get Started' },
+        { command: 'menu', description: '📋 Show Main Menu' },
+        { command: 'help', description: '💡 Show Help & Commands' },
+        
+        // Marketplace
+        { command: 'search', description: '🔎 Search Businesses' },
+        { command: 'registerbusiness', description: '🏬 Register Your Business' },
+        { command: 'mybusiness', description: '💼 Manage My Business' },
+        { command: 'myorders', description: '🛒 View My Orders' },
+        
+        // Food Delivery
+        { command: 'food', description: '🍽️ Food Delivery Hub' },
+        { command: 'restaurants', description: '🍕 Browse Restaurants' },
+        { command: 'orderfood', description: '🛒 Start Food Order' },
+        { command: 'orders', description: '📦 My Food Orders' },
+        { command: 'registerrestaurant', description: '🏪 Register Restaurant' },
+        
+        // Hotel Booking
+        { command: 'hotels', description: '🏨 Hotel Booking Hub' },
+        { command: 'search_hotels', description: '🔍 Search Hotels' },
+        { command: 'my_bookings', description: '📋 My Hotel Bookings' },
+        { command: 'register_hotel', description: '🏢 Register Hotel' },
+        
+        // Study Hub
+        { command: 'research', description: '🔍 Research Assistant' },
+        { command: 'notes', description: '📝 Create Smart Notes' },
+        { command: 'homework', description: '✏️ Get Homework Help' },
+        { command: 'study', description: '📖 Study Plan Generator' },
+        { command: 'timer', description: '⏱️ Start Study Timer' },
+        { command: 'studygroup', description: '👥 Study Groups Hub' },
+        { command: 'creategroup', description: '➕ Create Study Group' },
+        { command: 'findgroups', description: '🔍 Find Study Groups' },
+        { command: 'mygroups', description: '📚 My Study Groups' },
+        
+        // Events & Calendar
+        { command: 'addevent', description: '📅 Add Event/Exam' },
+        { command: 'events', description: '📆 View My Events' },
+        { command: 'countdown', description: '⏰ Event Countdowns' },
+        
+        // Career Tools
+        { command: 'analyze', description: '📄 Analyze CV/Document' },
+        { command: 'improve', description: '✨ Improve CV/Resume' },
+        { command: 'cover', description: '✉️ Generate Cover Letter' },
+        { command: 'score', description: '📊 Get ATS Score' },
+        { command: 'courses', description: '📚 Browse Courses' },
+        { command: 'webinars', description: '🎥 Find Webinars' },
+        { command: 'skills', description: '🔧 Learn New Skills' },
+        { command: 'mycourses', description: '📖 My Learning Dashboard' },
+        
+        // Crypto Trading
+        { command: 'crypto', description: '💰 Crypto Prices & Info' },
+        { command: 'cryptonews', description: '📰 Crypto News' },
+        { command: 'cryptoalert', description: '⏰ Set Price Alerts' },
+        { command: 'watchlist', description: '⭐ Manage Watchlist' },
+        { command: 'inventory', description: '💼 View Portfolio' },
+        { command: 'buy', description: '🟢 Buy Cryptocurrency' },
+        { command: 'sell', description: '🔴 Sell Cryptocurrency' },
+        
+        // System
+        { command: 'debug', description: '🔧 System Status' }
+      ];
+
+      await this.bot.setMyCommands(commands);
+      console.log('✅ Bot commands registered successfully (' + commands.length + ' commands)');
+    } catch (error) {
+      console.error('⚠️ Failed to register bot commands:', error.message);
     }
   }
 

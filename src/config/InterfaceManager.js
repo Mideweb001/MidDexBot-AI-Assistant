@@ -35,14 +35,24 @@ class InterfaceManager {
    */
   static getMainMenuKeyboard() {
     return {
-      keyboard: [
-        ['🛍️ Marketplace', '🍽️ Food Delivery'],
-        ['📚 Study Hub', '💼 Career Tools'],
-        ['💰 Crypto Trading', '🎯 Quick Actions'],
-        ['⚙️ Settings', '💡 Help']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
+      inline_keyboard: [
+        [
+          { text: '🛍️ Marketplace', callback_data: 'menu_marketplace' },
+          { text: '🍽️ Food Delivery', callback_data: 'menu_food' }
+        ],
+        [
+          { text: '📚 Study Hub', callback_data: 'menu_study' },
+          { text: '💼 Career Tools', callback_data: 'menu_career' }
+        ],
+        [
+          { text: '💰 Crypto Trading', callback_data: 'menu_crypto' },
+          { text: '🎯 Quick Actions', callback_data: 'menu_quick' }
+        ],
+        [
+          { text: '🏨 Hotels', callback_data: 'menu_hotels' },
+          { text: '💡 Help', callback_data: 'show_help' }
+        ]
+      ]
     };
   }
 
