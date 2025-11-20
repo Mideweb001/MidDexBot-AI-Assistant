@@ -1804,13 +1804,7 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         }
         // === HOTEL BOOKING CALLBACK HANDLERS ===
         else if (data === 'search_hotels') {
-          await this.bot.sendMessage(chatId, 
-            '🔍 *Search Hotels*\n\n' +
-            'Please send me a location to search for hotels.\n\n' +
-            'Example: Lagos, Abuja, Port Harcourt\n\n' +
-            'Or use: /search_hotels <location>',
-            { parse_mode: 'Markdown' }
-          );
+          await this.searchHotels(chatId, null);
         } else if (data === 'my_bookings') {
           await this.showMyHotelBookings(chatId);
         } else if (data === 'write_review') {
@@ -1819,6 +1813,21 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
           await this.startHotelRegistration(chatId);
         } else if (data === 'manage_hotels') {
           await this.showHotelManagement(chatId);
+        } else if (data.startsWith('hotel_details_')) {
+          const hotelId = parseInt(data.replace('hotel_details_', ''));
+          await this.showHotelDetails(chatId, hotelId);
+        } else if (data.startsWith('book_hotel_')) {
+          const hotelId = parseInt(data.replace('book_hotel_', ''));
+          await this.startHotelBooking(chatId, hotelId);
+        } else if (data.startsWith('hotel_reviews_')) {
+          const hotelId = parseInt(data.replace('hotel_reviews_', ''));
+          await this.bot.sendMessage(chatId, '⭐ Hotel reviews feature coming soon!');
+        } else if (data.startsWith('booking_details_')) {
+          const bookingId = parseInt(data.replace('booking_details_', ''));
+          await this.bot.sendMessage(chatId, '📋 Booking details feature coming soon!');
+        } else if (data.startsWith('manage_hotel_')) {
+          const hotelId = parseInt(data.replace('manage_hotel_', ''));
+          await this.bot.sendMessage(chatId, '🏨 Hotel management dashboard coming soon!');
         }
         // Handle dynamic study group callbacks
         else if (data.startsWith('sg_join_')) {
@@ -7071,11 +7080,9 @@ Send documents, ask questions, or use commands to get started!
 
   async handleLocation(msg) {
     const chatId = msg.chat.id;
-    const { latitude, longitude } = msg.location;
+    const { latitude, longitude} = msg.location;
     
     try {
-      await this.bot.sendMessage(chatId, '📍 Location received! Finding nearby restaurants...');
-      
       // Store location temporarily for future use
       await this.conversationManager.setUserData(chatId, 'userLocation', {
         latitude: latitude,
@@ -7083,11 +7090,524 @@ Send documents, ask questions, or use commands to get started!
         timestamp: Date.now()
       });
       
-      // Show nearby restaurants
-      await this.showNearbyRestaurants(chatId, latitude, longitude);
+      // Check what user is trying to do with location
+      const userData = await this.conversationManager.getUserData(chatId);
+      const awaitingLocation = userData?.awaitingLocation;
+      
+      if (awaitingLocation === 'hotel_search') {
+        await this.bot.sendMessage(chatId, '📍 Location received! 🏨 Finding nearby hotels...');
+        await this.searchHotelsByLocation(chatId, latitude, longitude);
+      } else {
+        // Default to restaurant search
+        await this.bot.sendMessage(chatId, '📍 Location received! Finding nearby restaurants...');
+        await this.showNearbyRestaurants(chatId, latitude, longitude);
+      }
+      
+      // Clear awaiting location flag
+      await this.conversationManager.setUserData(chatId, 'awaitingLocation', null);
     } catch (error) {
       console.error('Error handling location:', error);
       await this.bot.sendMessage(chatId, '❌ Error processing location. Please try again.');
+    }
+  }
+
+  // ===== HOTEL BOOKING METHODS =====
+
+  async searchHotels(chatId, location = null) {
+    try {
+      if (!location) {
+        // Prompt user to share location or enter city name
+        const keyboard = {
+          keyboard: [
+            [{
+              text: '📍 Share My Location',
+              request_location: true
+            }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'hotel_search');
+        await this.bot.sendMessage(chatId, 
+          '🏨 *Hotel Search*\n\n' +
+          'Please share your location or type a city name to search for hotels.\n\n' +
+          '📍 Tap the button below to share your current location\n' +
+          '🔤 Or type: `/search_hotels Lagos` for a specific city',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+          }
+        );
+        return;
+      }
+
+      // Search by city name
+      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Searching for hotels...');
+      
+      try {
+        const hotels = await this.hotelService.searchHotels({
+          city: location,
+          state: location, // Try state too
+          limit: 10
+        });
+
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+
+        if (hotels.length === 0) {
+          await this.bot.sendMessage(chatId,
+            `❌ No hotels found in "${location}"\n\n` +
+            'Try:\n' +
+            '• Using a different city name\n' +
+            '• Sharing your location for nearby hotels\n' +
+            '• Searching in a major city like Lagos, Abuja, Port Harcourt',
+            {
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: '🔍 Try Another Search', callback_data: 'search_hotels' },
+                  { text: '🏠 Main Menu', callback_data: 'main_menu' }
+                ]]
+              }
+            }
+          );
+          return;
+        }
+
+        // Display hotels
+        await this.displayHotelResults(chatId, hotels, location);
+      } catch (error) {
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error searching hotels:', error);
+      await this.bot.sendMessage(chatId,
+        '❌ Error searching for hotels. Please try again.\n\n' +
+        'Use `/search_hotels <city>` or share your location.',
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 Try Again', callback_data: 'search_hotels' },
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    }
+  }
+
+  async searchHotelsByLocation(chatId, latitude, longitude) {
+    try {
+      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Finding hotels near you...');
+      
+      try {
+        // Get city name from coordinates using reverse geocoding
+        const response = await require('axios').get('https://nominatim.openstreetmap.org/reverse', {
+          params: {
+            lat: latitude,
+            lon: longitude,
+            format: 'json'
+          },
+          headers: {
+            'User-Agent': 'TelegramBot/1.0'
+          }
+        });
+
+        const locationName = response.data.address?.city || 
+                           response.data.address?.town || 
+                           response.data.address?.state || 
+                           'your location';
+
+        // Search hotels near coordinates
+        const hotels = await this.hotelService.searchHotels({
+          latitude: latitude,
+          longitude: longitude,
+          maxDistance: 50, // 50km radius
+          limit: 15
+        });
+
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+
+        if (hotels.length === 0) {
+          await this.bot.sendMessage(chatId,
+            `❌ No hotels found within 50km of your location.\n\n` +
+            `📍 Location: ${locationName}\n\n` +
+            'Try:\n' +
+            '• Searching in a nearby city\n' +
+            '• Expanding search radius\n' +
+            '• Using city name instead',
+            {
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: '🔍 Search by City', callback_data: 'search_hotels' },
+                  { text: '🏠 Main Menu', callback_data: 'main_menu' }
+                ]]
+              }
+            }
+          );
+          return;
+        }
+
+        // Display hotels with distance
+        await this.displayHotelResults(chatId, hotels, locationName, true);
+      } catch (error) {
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error searching hotels by location:', error);
+      await this.bot.sendMessage(chatId,
+        '❌ Error finding nearby hotels. Please try searching by city name instead.\n\n' +
+        'Use `/search_hotels <city>`',
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔍 Search by City', callback_data: 'search_hotels' },
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    }
+  }
+
+  async displayHotelResults(chatId, hotels, location, showDistance = false) {
+    try {
+      let message = `🏨 *Hotels in ${location}*\n\n`;
+      message += `Found ${hotels.length} hotel${hotels.length > 1 ? 's' : ''}\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      hotels.forEach((hotel, index) => {
+        const stars = '⭐'.repeat(hotel.star_rating || 0);
+        const rating = hotel.rating ? `${hotel.rating}/5` : 'N/A';
+        
+        message += `${index + 1}. *${hotel.hotel_name}*\n`;
+        if (stars) message += `${stars}\n`;
+        message += `📍 ${hotel.city}${hotel.state ? `, ${hotel.state}` : ''}\n`;
+        if (hotel.distance) message += `📏 ${hotel.distance.toFixed(1)}km away\n`;
+        message += `⭐ Rating: ${rating}`;
+        if (hotel.total_reviews) message += ` (${hotel.total_reviews} reviews)`;
+        message += `\n`;
+        
+        // Show price if available
+        if (hotel.room_types && hotel.room_types.length > 0) {
+          const minPrice = Math.min(...hotel.room_types.map(r => r.price));
+          message += `💰 From ₦${minPrice.toLocaleString()}/night\n`;
+        }
+        
+        message += `\n`;
+      });
+
+      // Create inline keyboard with hotel options
+      const keyboard = [];
+      hotels.slice(0, 8).forEach((hotel, index) => {
+        keyboard.push([{
+          text: `${index + 1}. ${hotel.hotel_name.substring(0, 30)}`,
+          callback_data: `hotel_details_${hotel.id}`
+        }]);
+      });
+
+      keyboard.push([
+        { text: '🔍 New Search', callback_data: 'search_hotels' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error displaying hotel results:', error);
+      await this.bot.sendMessage(chatId, '❌ Error displaying results. Please try again.');
+    }
+  }
+
+  async showHotelDetails(chatId, hotelId) {
+    try {
+      const { Hotel } = require('./models');
+      const hotel = await Hotel.findByPk(hotelId, {
+        include: [{ model: require('./models').User, as: 'owner' }]
+      });
+
+      if (!hotel) {
+        await this.bot.sendMessage(chatId, '❌ Hotel not found.');
+        return;
+      }
+
+      const stars = '⭐'.repeat(hotel.star_rating || 0);
+      const rating = hotel.rating ? `${hotel.rating}/5` : 'N/A';
+      
+      let message = `🏨 *${hotel.hotel_name}*\n\n`;
+      if (stars) message += `${stars}\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      
+      message += `📍 *Location*\n`;
+      message += `${hotel.address}\n`;
+      message += `${hotel.city}, ${hotel.state}\n\n`;
+      
+      if (hotel.description) {
+        message += `📝 *About*\n`;
+        message += `${hotel.description.substring(0, 200)}${hotel.description.length > 200 ? '...' : ''}\n\n`;
+      }
+      
+      message += `⭐ *Rating*\n`;
+      message += `${rating}`;
+      if (hotel.total_reviews) message += ` from ${hotel.total_reviews} reviews`;
+      message += `\n\n`;
+      
+      if (hotel.amenities && hotel.amenities.length > 0) {
+        message += `✨ *Amenities*\n`;
+        hotel.amenities.slice(0, 6).forEach(amenity => {
+          message += `• ${amenity}\n`;
+        });
+        if (hotel.amenities.length > 6) {
+          message += `+ ${hotel.amenities.length - 6} more...\n`;
+        }
+        message += `\n`;
+      }
+      
+      if (hotel.room_types && hotel.room_types.length > 0) {
+        message += `🛏️ *Room Types*\n`;
+        hotel.room_types.forEach(room => {
+          message += `• ${room.type}: ₦${room.price.toLocaleString()}/night\n`;
+        });
+        message += `\n`;
+      }
+      
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      message += `📞 Contact: ${hotel.phone_number || 'N/A'}\n`;
+      if (hotel.email) message += `📧 Email: ${hotel.email}\n`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '📅 Book Now', callback_data: `book_hotel_${hotelId}` },
+            { text: '⭐ Reviews', callback_data: `hotel_reviews_${hotelId}` }
+          ],
+          [
+            { text: '📍 View on Map', url: `https://www.google.com/maps?q=${hotel.latitude},${hotel.longitude}` }
+          ],
+          [
+            { text: '🔙 Back to Results', callback_data: 'search_hotels' },
+            { text: '🏠 Main Menu', callback_data: 'main_menu' }
+          ]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('Error showing hotel details:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading hotel details. Please try again.');
+    }
+  }
+
+  async startHotelBooking(chatId, hotelId) {
+    try {
+      await this.bot.sendMessage(chatId,
+        '🏗️ *Hotel Booking System*\n\n' +
+        'This feature is coming soon! We are integrating with:\n\n' +
+        '• Booking.com API\n' +
+        '• Amadeus Hotel API\n' +
+        '• Direct hotel partnerships\n\n' +
+        'For now, you can:\n' +
+        '1. View hotel details and contact info\n' +
+        '2. See reviews and ratings\n' +
+        '3. Get directions to the hotel\n\n' +
+        'Stay tuned for direct bookings! 🚀',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔍 Search Hotels', callback_data: 'search_hotels' },
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error starting hotel booking:', error);
+      await this.bot.sendMessage(chatId, '❌ Error. Please try again.');
+    }
+  }
+
+  async showMyHotelBookings(chatId) {
+    try {
+      const bookings = await this.hotelService.getUserBookings(chatId);
+      
+      if (bookings.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '📋 *My Hotel Bookings*\n\n' +
+          'You haven\'t made any hotel bookings yet.\n\n' +
+          'Start by searching for hotels in your desired location!',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🔍 Search Hotels', callback_data: 'search_hotels' },
+                { text: '🏠 Main Menu', callback_data: 'main_menu' }
+              ]]
+            }
+          }
+        );
+        return;
+      }
+
+      let message = `📋 *My Hotel Bookings*\n\n`;
+      message += `You have ${bookings.length} booking${bookings.length > 1 ? 's' : ''}\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      bookings.slice(0, 5).forEach((booking, index) => {
+        const status = booking.booking_status.toUpperCase();
+        const emoji = {
+          'PENDING': '⏳',
+          'CONFIRMED': '✅',
+          'CHECKED_IN': '🏨',
+          'CHECKED_OUT': '✔️',
+          'CANCELLED': '❌'
+        }[status] || '📋';
+
+        message += `${index + 1}. ${emoji} *${booking.hotel.hotel_name}*\n`;
+        message += `Reference: ${booking.booking_reference}\n`;
+        message += `Check-in: ${new Date(booking.check_in_date).toLocaleDateString()}\n`;
+        message += `Status: ${status}\n`;
+        message += `Total: ₦${booking.total_price.toLocaleString()}\n\n`;
+      });
+
+      const keyboard = bookings.slice(0, 5).map((booking, index) => [{
+        text: `${index + 1}. View Booking`,
+        callback_data: `booking_details_${booking.id}`
+      }]);
+
+      keyboard.push([
+        { text: '🔍 New Booking', callback_data: 'search_hotels' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing hotel bookings:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading bookings. Please try again.');
+    }
+  }
+
+  async startHotelRegistration(chatId) {
+    try {
+      await this.bot.sendMessage(chatId,
+        '🏨 *Register Your Hotel*\n\n' +
+        'List your hotel on our platform!\n\n' +
+        '*Requirements:*\n' +
+        '• Valid business registration\n' +
+        '• Hotel license/permit\n' +
+        '• Contact information\n' +
+        '• Hotel photos\n' +
+        '• Room details and pricing\n\n' +
+        '*Benefits:*\n' +
+        '✅ Reach more customers\n' +
+        '✅ Easy booking management\n' +
+        '✅ Instant notifications\n' +
+        '✅ Customer reviews\n\n' +
+        'Contact us to get started:\n' +
+        '📧 hotels@middexbot.com\n' +
+        '📱 WhatsApp: +234 XXX XXX XXXX',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '📧 Contact Support', url: 'https://t.me/middexbot_support' },
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error starting hotel registration:', error);
+      await this.bot.sendMessage(chatId, '❌ Error. Please try again.');
+    }
+  }
+
+  async startHotelReview(chatId, bookingId) {
+    try {
+      await this.bot.sendMessage(chatId,
+        '⭐ *Hotel Review*\n\n' +
+        'Hotel review feature coming soon!\n\n' +
+        'Soon you will be able to:\n' +
+        '• Rate your stay\n' +
+        '• Write detailed reviews\n' +
+        '• Upload photos\n' +
+        '• Help other travelers',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🏨 Search Hotels', callback_data: 'search_hotels' },
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error starting hotel review:', error);
+      await this.bot.sendMessage(chatId, '❌ Error. Please try again.');
+    }
+  }
+
+  async showHotelManagement(chatId) {
+    try {
+      const hotels = await this.hotelService.getUserHotels(chatId);
+      
+      if (hotels.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '🏨 *Hotel Management*\n\n' +
+          'You don\'t have any registered hotels yet.\n\n' +
+          'Register your hotel to start accepting bookings!',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '➕ Register Hotel', callback_data: 'register_hotel' },
+                { text: '🏠 Main Menu', callback_data: 'main_menu' }
+              ]]
+            }
+          }
+        );
+        return;
+      }
+
+      let message = `🏨 *My Hotels*\n\n`;
+      message += `You manage ${hotels.length} hotel${hotels.length > 1 ? 's' : ''}\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      hotels.forEach((hotel, index) => {
+        const status = hotel.status === 'approved' ? '✅' : hotel.status === 'pending' ? '⏳' : '❌';
+        message += `${index + 1}. ${status} *${hotel.hotel_name}*\n`;
+        message += `${hotel.city}, ${hotel.state}\n`;
+        message += `Rating: ${hotel.rating || 'N/A'}/5\n`;
+        message += `Status: ${hotel.status.toUpperCase()}\n\n`;
+      });
+
+      const keyboard = hotels.map((hotel, index) => [{
+        text: `${index + 1}. Manage`,
+        callback_data: `manage_hotel_${hotel.id}`
+      }]);
+
+      keyboard.push([
+        { text: '➕ Add Hotel', callback_data: 'register_hotel' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing hotel management:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading hotels. Please try again.');
     }
   }
 
