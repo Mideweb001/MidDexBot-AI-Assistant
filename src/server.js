@@ -170,13 +170,17 @@ class TelegramDocumentBot {
     // Start command
     this.bot.onText(/\/start/, async (msg) => {
       const chatId = msg.chat.id;
-      await this.showMainMenu(chatId);
+      // Ensure user is created/updated in database with their Telegram info
+      await this.databaseService.findOrCreateUser(msg.from);
+      await this.showMainMenu(chatId, msg.from);
     });
 
     // Menu command - same as start
     this.bot.onText(/\/menu/, async (msg) => {
       const chatId = msg.chat.id;
-      await this.showMainMenu(chatId);
+      // Ensure user is created/updated in database
+      await this.databaseService.findOrCreateUser(msg.from);
+      await this.showMainMenu(chatId, msg.from);
     });
 
     // Research command
@@ -1536,7 +1540,9 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         break;
 
       case 'main_menu':
-        await this.showMainMenu(chatId);
+        // Ensure user is created/updated before showing menu
+        await this.databaseService.findOrCreateUser(query.from);
+        await this.showMainMenu(chatId, query.from);
         break;
 
       // === MENU NAVIGATION CALLBACKS ===
@@ -5359,9 +5365,18 @@ Send documents, ask questions, or use commands to get started!
     return InterfaceManager.getMainMenuKeyboard();
   }
 
-  async showMainMenu(chatId) {
-    const user = await this.databaseService.getUserByTelegramId(chatId);
-    const firstName = user ? user.first_name : 'there';
+  async showMainMenu(chatId, telegramUser = null) {
+    // Try to get user from database first
+    let user = await this.databaseService.getUserByTelegramId(chatId);
+    
+    // If no user in database but we have Telegram user info, use it
+    let firstName = 'there';
+    if (user && user.first_name) {
+      firstName = user.first_name;
+    } else if (telegramUser) {
+      // Use Telegram user info directly
+      firstName = telegramUser.first_name || telegramUser.username || 'there';
+    }
     
     const message = InterfaceManager.getMainMenuMessage(firstName);
 
