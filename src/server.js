@@ -1387,8 +1387,18 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       // Answer the callback query immediately
       await this.bot.answerCallbackQuery(query.id);
       
+      // Auto-register user if not exists
+      let user = await this.databaseService.getUserByTelegramId(chatId);
+      if (!user && query.from) {
+        user = await this.databaseService.createUser({
+          telegram_id: chatId,
+          username: query.from.username || null,
+          first_name: query.from.first_name || 'User',
+          last_name: query.from.last_name || null
+        });
+      }
+      
       // Get last processed document for this chat from database
-      const user = await this.databaseService.getUserByTelegramId(chatId);
       const lastDoc = user ? await this.databaseService.getLastUserDocument(user.id) : null;
       
       // Handle different callback actions
