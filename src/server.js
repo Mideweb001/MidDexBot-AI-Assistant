@@ -545,7 +545,7 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     });
 
     // Hotel booking menu command
-    this.bot.onText(/\/hotels/, async (msg) => {
+    this.bot.onText(/\/hotels?/, async (msg) => {
       const chatId = msg.chat.id;
       await this.showHotelsMenu(chatId);
     });
