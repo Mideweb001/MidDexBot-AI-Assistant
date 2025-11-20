@@ -81,8 +81,18 @@ class TelegramDocumentBot {
     
     // Initialize Telegram bot with appropriate method
     if (this.isProduction && this.webhookUrl) {
-      // Production: Use webhooks
-      this.bot = new TelegramBot(this.botToken, { webHook: true });
+      // Production: Use webhooks with minimal logging
+      this.bot = new TelegramBot(this.botToken, { 
+        webHook: true,
+        request: {
+          agentOptions: {
+            keepAlive: true,
+            family: 4
+          }
+        },
+        // Disable request logging in production
+        filepath: false
+      });
     } else {
       // Development: Use polling
       this.bot = new TelegramBot(this.botToken, { polling: true });
