@@ -232,8 +232,8 @@ class InterfaceManager {
     } else if (section === 'food') {
       keyboard.inline_keyboard = [
         [
-          { text: '🍕 Restaurants', callback_data: 'browse_restaurants' },
-          { text: '🛒 Order Now', callback_data: 'start_food_order' }
+          { text: '🔍 Search Restaurants', callback_data: 'search_restaurants' },
+          { text: '🍕 Browse All', callback_data: 'browse_restaurants' }
         ],
         [
           { text: '📦 My Orders', callback_data: 'my_food_orders' },

@@ -809,6 +809,19 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showHotelManagement(chatId);
     });
 
+    // Search restaurants command
+    this.bot.onText(/\/search_restaurants(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const location = match && match[1] ? match[1].trim() : null;
+      await this.searchRestaurants(chatId, location);
+    });
+
+    // Browse restaurants command
+    this.bot.onText(/\/restaurants/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurants(chatId, null);
+    });
+
     // Review hotel command
     this.bot.onText(/\/review_hotel(?:\s+(.+))?/, async (msg, match) => {
       const chatId = msg.chat.id;
@@ -1828,6 +1841,23 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         } else if (data.startsWith('manage_hotel_')) {
           const hotelId = parseInt(data.replace('manage_hotel_', ''));
           await this.bot.sendMessage(chatId, '🏨 Hotel management dashboard coming soon!');
+        }
+        // Restaurant callbacks
+        else if (data === 'search_restaurants') {
+          await this.searchRestaurants(chatId, null);
+        } else if (data === 'browse_restaurants') {
+          await this.searchRestaurants(chatId, null);
+        } else if (data.startsWith('restaurant_menu_')) {
+          const restaurantId = parseInt(data.replace('restaurant_menu_', ''));
+          await this.showRestaurantDetails(chatId, restaurantId);
+        } else if (data.startsWith('menu_category_')) {
+          const parts = data.replace('menu_category_', '').split('_');
+          const restaurantId = parseInt(parts[0]);
+          const category = decodeURIComponent(parts.slice(1).join('_'));
+          await this.showMenuCategory(chatId, restaurantId, category);
+        } else if (data.startsWith('view_cart_')) {
+          const restaurantId = parseInt(data.replace('view_cart_', ''));
+          await this.bot.sendMessage(chatId, '🛒 Cart feature coming soon!');
         }
         // Handle dynamic study group callbacks
         else if (data.startsWith('sg_join_')) {
@@ -7097,10 +7127,13 @@ Send documents, ask questions, or use commands to get started!
       if (awaitingLocation === 'hotel_search') {
         await this.bot.sendMessage(chatId, '📍 Location received! 🏨 Finding nearby hotels...');
         await this.searchHotelsByLocation(chatId, latitude, longitude);
+      } else if (awaitingLocation === 'restaurant_search') {
+        await this.bot.sendMessage(chatId, '📍 Location received! 🍽️ Finding nearby restaurants...');
+        await this.searchRestaurantsByLocation(chatId, latitude, longitude);
       } else {
         // Default to restaurant search
         await this.bot.sendMessage(chatId, '📍 Location received! Finding nearby restaurants...');
-        await this.showNearbyRestaurants(chatId, latitude, longitude);
+        await this.searchRestaurantsByLocation(chatId, latitude, longitude);
       }
       
       // Clear awaiting location flag
@@ -7608,6 +7641,338 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error showing hotel management:', error);
       await this.bot.sendMessage(chatId, '❌ Error loading hotels. Please try again.');
+    }
+  }
+
+  // ===== RESTAURANT SEARCH METHODS =====
+
+  async searchRestaurants(chatId, location = null) {
+    try {
+      if (!location) {
+        // Prompt user to share location or enter city name
+        const keyboard = {
+          keyboard: [
+            [{
+              text: '📍 Share My Location',
+              request_location: true
+            }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'restaurant_search');
+        await this.bot.sendMessage(chatId, 
+          '🍽️ *Restaurant Search*\n\n' +
+          'Please share your location or type a city name to find restaurants.\n\n' +
+          '📍 Tap the button below to share your current location\n' +
+          '🔤 Or type: `/search_restaurants Lagos` for a specific city',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+          }
+        );
+        return;
+      }
+
+      // Search by city/area name
+      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Searching for restaurants...');
+      
+      try {
+        const restaurants = await FoodOrderService.getRestaurantsByLocation(location);
+        
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+        
+        if (restaurants.length === 0) {
+          await this.bot.sendMessage(chatId, 
+            `😕 No restaurants found in *${location}*.\n\n` +
+            `Try:\n` +
+            `• A different area or city name\n` +
+            `• Sharing your location for nearby results\n` +
+            `• Browsing all restaurants with /restaurants`,
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        await this.displayRestaurantResults(chatId, restaurants, location);
+      } catch (error) {
+        await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error searching restaurants:', error);
+      await this.bot.sendMessage(chatId, 
+        '❌ Error searching restaurants. Please try again or use /restaurants to browse.'
+      );
+    }
+  }
+
+  async searchRestaurantsByLocation(chatId, latitude, longitude) {
+    try {
+      await this.bot.sendMessage(chatId, '🔍 Finding restaurants near you...');
+      
+      // Get city name from coordinates using reverse geocoding
+      let cityName = 'your location';
+      try {
+        const geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
+        const response = await axios.get(geocodeUrl, {
+          headers: {
+            'User-Agent': 'TelegramBot/1.0'
+          }
+        });
+        
+        if (response.data && response.data.address) {
+          cityName = response.data.address.city || 
+                    response.data.address.town || 
+                    response.data.address.village || 
+                    response.data.address.county || 
+                    'your location';
+        }
+      } catch (geoError) {
+        console.error('Geocoding error:', geoError);
+      }
+
+      // Get nearby restaurants
+      const restaurants = await FoodOrderService.getNearbyRestaurants(latitude, longitude);
+      
+      if (restaurants.length === 0) {
+        await this.bot.sendMessage(chatId, 
+          '😕 No restaurants found within 50km of your location.\n\n' +
+          'Try:\n' +
+          '• Expanding your search area\n' +
+          '• Searching by city name: `/search_restaurants Lagos`\n' +
+          '• Browsing all restaurants: /restaurants',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      // Calculate distances and sort by proximity
+      const restaurantsWithDistance = restaurants.map(restaurant => {
+        const distance = this.calculateDistance(
+          latitude, 
+          longitude, 
+          restaurant.latitude, 
+          restaurant.longitude
+        );
+        return { ...restaurant.toJSON(), distance };
+      }).sort((a, b) => a.distance - b.distance);
+
+      await this.displayRestaurantResults(chatId, restaurantsWithDistance, cityName, true);
+    } catch (error) {
+      console.error('Error searching restaurants by location:', error);
+      await this.bot.sendMessage(chatId, 
+        '❌ Error finding nearby restaurants. Please try again.'
+      );
+    }
+  }
+
+  async displayRestaurantResults(chatId, restaurants, location, showDistance = false) {
+    try {
+      let message = `🍽️ *Restaurants in ${location}*\n\n`;
+      message += `Found ${restaurants.length} restaurant${restaurants.length > 1 ? 's' : ''}:\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      const keyboard = [];
+      const displayCount = Math.min(restaurants.length, 8);
+
+      for (let i = 0; i < displayCount; i++) {
+        const restaurant = restaurants[i];
+        const status = restaurant.isOpen ? restaurant.isOpen() ? '🟢' : '🔴' : '🟢';
+        const rating = restaurant.rating || 0;
+        const ratingStars = '⭐'.repeat(Math.round(rating));
+        
+        message += `${status} *${restaurant.name}*\n`;
+        message += `🍽️ ${restaurant.cuisine_type || 'Various'} | ${ratingStars} ${rating.toFixed(1)}\n`;
+        
+        if (showDistance && restaurant.distance !== undefined) {
+          message += `📍 ${restaurant.distance.toFixed(1)} km away\n`;
+        } else if (restaurant.address) {
+          message += `📍 ${restaurant.address}\n`;
+        }
+        
+        if (restaurant.delivery_fee !== undefined) {
+          message += `🚚 Delivery: ₦${restaurant.delivery_fee} • `;
+        }
+        if (restaurant.average_preparation_time) {
+          message += `⏱️ ${restaurant.average_preparation_time} min`;
+        }
+        message += `\n\n`;
+
+        // Add button for this restaurant (max 2 per row)
+        if (i % 2 === 0) {
+          keyboard.push([]);
+        }
+        keyboard[keyboard.length - 1].push({
+          text: `🍽️ ${restaurant.name}`,
+          callback_data: `restaurant_menu_${restaurant.id}`
+        });
+      }
+
+      if (restaurants.length > displayCount) {
+        message += `\n_...and ${restaurants.length - displayCount} more restaurants_\n`;
+      }
+
+      // Add navigation buttons
+      keyboard.push([
+        { text: '🔄 New Search', callback_data: 'search_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error displaying restaurant results:', error);
+      await this.bot.sendMessage(chatId, '❌ Error displaying results. Please try again.');
+    }
+  }
+
+  async showRestaurantDetails(chatId, restaurantId) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantDetails(restaurantId);
+      
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+        return;
+      }
+
+      const status = restaurant.isOpen() ? '🟢 Open Now' : '🔴 Closed';
+      const rating = restaurant.rating || 0;
+      const ratingStars = '⭐'.repeat(Math.round(rating));
+      
+      let message = `🍽️ *${restaurant.name}*\n\n`;
+      message += `${status} | ${ratingStars} ${rating.toFixed(1)}/5\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      
+      message += `🍽️ *Cuisine:* ${restaurant.cuisine_type || 'Various'}\n`;
+      
+      if (restaurant.address) {
+        message += `📍 *Location:* ${restaurant.address}\n`;
+      }
+      
+      if (restaurant.phone) {
+        message += `📞 *Phone:* ${restaurant.phone}\n`;
+      }
+      
+      message += `\n💵 *Pricing:*\n`;
+      message += `• Delivery Fee: ₦${restaurant.delivery_fee || 0}\n`;
+      message += `• Minimum Order: ₦${restaurant.minimum_order_amount || 0}\n`;
+      message += `• Preparation Time: ${restaurant.average_preparation_time || 30} min\n`;
+      
+      if (restaurant.description) {
+        message += `\n📝 *About:*\n${restaurant.description}\n`;
+      }
+
+      // Get menu categories
+      const menuItems = restaurant.menuItems || [];
+      const categories = [...new Set(menuItems.map(item => item.category))];
+      
+      if (categories.length > 0) {
+        message += `\n📋 *Menu Categories:* (${categories.length})\n`;
+        categories.slice(0, 5).forEach(category => {
+          const count = menuItems.filter(i => i.category === category).length;
+          message += `• ${category} (${count} items)\n`;
+        });
+      }
+
+      const keyboard = [];
+      
+      // Add category buttons (2 per row)
+      categories.forEach((category, index) => {
+        if (index % 2 === 0) {
+          keyboard.push([]);
+        }
+        keyboard[keyboard.length - 1].push({
+          text: `🍽️ ${category}`,
+          callback_data: `menu_category_${restaurantId}_${encodeURIComponent(category)}`
+        });
+      });
+
+      // Add action buttons
+      keyboard.push([
+        { text: '🛒 View Cart', callback_data: `view_cart_${restaurantId}` },
+        { text: '📞 Call', url: `tel:${restaurant.phone || ''}` }
+      ]);
+      
+      // Add Google Maps link if coordinates exist
+      if (restaurant.latitude && restaurant.longitude) {
+        keyboard.push([{
+          text: '📍 View on Maps',
+          url: `https://www.google.com/maps?q=${restaurant.latitude},${restaurant.longitude}`
+        }]);
+      }
+      
+      keyboard.push([
+        { text: '🔙 Back to Results', callback_data: 'browse_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing restaurant details:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurant details. Please try again.');
+    }
+  }
+
+  async showMenuCategory(chatId, restaurantId, category) {
+    try {
+      const restaurant = await FoodOrderService.getRestaurantDetails(restaurantId);
+      
+      if (!restaurant) {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+        return;
+      }
+
+      const menuItems = restaurant.menuItems.filter(item => item.category === category);
+      
+      if (menuItems.length === 0) {
+        await this.bot.sendMessage(chatId, `😕 No items found in ${category} category.`);
+        return;
+      }
+
+      let message = `🍽️ *${restaurant.name}*\n`;
+      message += `📋 *${category}*\n\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      const keyboard = [];
+
+      menuItems.forEach(item => {
+        const available = item.is_available ? '✅' : '❌';
+        message += `${available} *${item.name}*\n`;
+        if (item.description) {
+          message += `   ${item.description}\n`;
+        }
+        message += `   💰 ₦${item.price.toFixed(2)}\n`;
+        if (item.discount_price) {
+          message += `   🏷️ Discount: ₦${item.discount_price.toFixed(2)}\n`;
+        }
+        message += `\n`;
+
+        if (item.is_available) {
+          keyboard.push([
+            { text: `➕ ${item.name} - ₦${item.price}`, callback_data: `add_to_cart_${restaurantId}_${item.id}` }
+          ]);
+        }
+      });
+
+      keyboard.push([
+        { text: '🛒 View Cart', callback_data: `view_cart_${restaurantId}` },
+        { text: '🔙 Back', callback_data: `restaurant_menu_${restaurantId}` }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing menu category:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading menu. Please try again.');
     }
   }
 
