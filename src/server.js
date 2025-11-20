@@ -2106,21 +2106,21 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
 
       }
     } catch (error) {
-      console.error('❌ Callback query error:', error);
+      // Log error briefly without full stack trace
+      console.log('❌ Callback error:', error.message || 'Unknown');
       try {
         await this.bot.sendMessage(query.message.chat.id, 
-          '❌ Sorry, something went wrong processing your request. Please try again.',
+          '❌ Sorry, something went wrong. Please try again.',
           {
             reply_markup: {
               inline_keyboard: [[
-                { text: '🏠 Main Menu', callback_data: 'main_menu' },
-                { text: '🔄 Try Again', callback_data: query.data }
+                { text: '🏠 Main Menu', callback_data: 'main_menu' }
               ]]
             }
           }
         );
       } catch (sendError) {
-        console.error('❌ Failed to send error message:', sendError);
+        // Silently fail
       }
     }
   }
@@ -3804,9 +3804,10 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
       ];
 
       await this.bot.setMyCommands(commands);
-      console.log('✅ Bot commands registered successfully (' + commands.length + ' commands)');
+      console.log('✅ Bot commands registered (' + commands.length + ' commands)');
     } catch (error) {
-      console.error('⚠️ Failed to register bot commands:', error.message);
+      // Silently fail - commands are optional
+      console.log('⚠️ Commands not registered');
     }
   }
 
