@@ -1380,18 +1380,19 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
   }
 
   async handleCallbackQuery(query) {
-    const chatId = query.message.chat.id;
-    const data = query.data;
-    
-    // Answer the callback query
-    await this.bot.answerCallbackQuery(query.id);
-    
-    // Get last processed document for this chat from database
-    const user = await this.databaseService.getUserByTelegramId(chatId);
-    const lastDoc = user ? await this.databaseService.getLastUserDocument(user.id) : null;
-    
-    // Handle different callback actions
-    switch (data) {
+    try {
+      const chatId = query.message.chat.id;
+      const data = query.data;
+      
+      // Answer the callback query immediately
+      await this.bot.answerCallbackQuery(query.id);
+      
+      // Get last processed document for this chat from database
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      const lastDoc = user ? await this.databaseService.getLastUserDocument(user.id) : null;
+      
+      // Handle different callback actions
+      switch (data) {
       case 'analyze_more':
         await this.bot.sendMessage(chatId, '� Send me another document to analyze!');
         break;
@@ -2103,6 +2104,24 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.requestUserLocation(chatId);
         break;
 
+      }
+    } catch (error) {
+      console.error('❌ Callback query error:', error);
+      try {
+        await this.bot.sendMessage(query.message.chat.id, 
+          '❌ Sorry, something went wrong processing your request. Please try again.',
+          {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🏠 Main Menu', callback_data: 'main_menu' },
+                { text: '🔄 Try Again', callback_data: query.data }
+              ]]
+            }
+          }
+        );
+      } catch (sendError) {
+        console.error('❌ Failed to send error message:', sendError);
+      }
     }
   }
 
