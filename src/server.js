@@ -5,6 +5,51 @@ const path = require('path');
 const fs = require('fs').promises;
 require('dotenv').config();
 
+// CRITICAL: Disable ALL request module logging in production
+if (process.env.NODE_ENV === 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1'; // Keep SSL validation
+  process.env.DEBUG = ''; // Disable debug logging
+  
+  // Suppress request library verbose logging
+  try {
+    const request = require('@cypress/request');
+    if (request && request.debug) {
+      request.debug = false;
+    }
+  } catch (e) {
+    // request module not directly accessible, continue
+  }
+}
+
+// Suppress verbose logging in production
+if (process.env.NODE_ENV === 'production') {
+  // Redirect telegram-bot-api internal logging to /dev/null
+  const originalLog = console.log;
+  const originalError = console.error;
+  
+  console.log = (...args) => {
+    // Only log our custom messages (with emojis or specific prefixes)
+    const message = args[0];
+    if (typeof message === 'string' && 
+        (message.includes('✅') || message.includes('❌') || 
+         message.includes('🔍') || message.includes('📭') ||
+         message.includes('⚠️') || message.includes('🌐') ||
+         message.includes('🚀') || message.includes('💎') ||
+         message.includes('🏭') || message.includes('🔗'))) {
+      originalLog.apply(console, args);
+    }
+    // Suppress everything else (library internals)
+  };
+  
+  console.error = (...args) => {
+    // Only log actual errors
+    const message = args[0];
+    if (typeof message === 'string' && message.includes('❌')) {
+      originalError.apply(console, args);
+    }
+  };
+}
+
 const DocumentProcessor = require('./services/DocumentProcessor');
 const AIAnalyzer = require('./services/AIAnalyzer');
 const ConversationManager = require('./services/ConversationManager');
@@ -81,17 +126,22 @@ class TelegramDocumentBot {
     
     // Initialize Telegram bot with appropriate method
     if (this.isProduction && this.webhookUrl) {
-      // Production: Use webhooks with minimal logging
+      // Production: Use webhooks with ZERO logging
       this.bot = new TelegramBot(this.botToken, { 
         webHook: true,
         request: {
           agentOptions: {
             keepAlive: true,
             family: 4
-          }
+          },
+          // Completely disable request logging
+          verbose: false,
+          strictSSL: true,
+          debug: false
         },
-        // Disable request logging in production
-        filepath: false
+        // Disable all file and request logging
+        filepath: false,
+        onlyFirstMatch: true
       });
     } else {
       // Development: Use polling
