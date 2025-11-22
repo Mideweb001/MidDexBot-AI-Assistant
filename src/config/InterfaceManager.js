@@ -837,6 +837,316 @@ class InterfaceManager {
     
     return { inline_keyboard: keyboard };
   }
+
+  // ===== HOTEL BOOKING UI METHODS =====
+
+  /**
+   * Get hotel state selection menu (Nigerian states)
+   */
+  static getHotelStateSelectionMenu() {
+    const HotelDiscoveryService = require('../services/HotelDiscoveryService');
+    const states = HotelDiscoveryService.getAllStates();
+    
+    const keyboard = [];
+    
+    // Create rows of 2 states each
+    for (let i = 0; i < states.length; i += 2) {
+      const row = [];
+      row.push({ 
+        text: `📍 ${states[i]}`, 
+        callback_data: `hotel_state_${states[i]}` 
+      });
+      
+      if (i + 1 < states.length) {
+        row.push({ 
+          text: `📍 ${states[i + 1]}`, 
+          callback_data: `hotel_state_${states[i + 1]}` 
+        });
+      }
+      
+      keyboard.push(row);
+    }
+    
+    // Add back button
+    keyboard.push([
+      { text: '🔙 Back to Hotels', callback_data: 'menu_hotels' },
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+    
+    return {
+      message: '🏨 *Browse Hotels by State*\n\n' +
+               'Select a Nigerian state to see available hotels:\n\n' +
+               '━━━━━━━━━━━━━━━━━━━━',
+      keyboard: { inline_keyboard: keyboard }
+    };
+  }
+
+  /**
+   * Get city selection menu for a state
+   */
+  static getHotelCitySelectionMenu(stateName, cities) {
+    const keyboard = [];
+    
+    // Show all cities in the state
+    cities.forEach(city => {
+      keyboard.push([{
+        text: `🏙️ ${city.name}`,
+        callback_data: `hotel_city_${stateName}_${city.name}`
+      }]);
+    });
+    
+    // Navigation buttons
+    keyboard.push([
+      { text: '🔙 Back to States', callback_data: 'hotel_browse_states' },
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+    
+    return {
+      message: `🏨 *Hotels in ${stateName} State*\n\n` +
+               `Select a city to see available hotels:\n\n` +
+               `📍 ${cities.length} cities available\n\n` +
+               `━━━━━━━━━━━━━━━━━━━━`,
+      keyboard: { inline_keyboard: keyboard }
+    };
+  }
+
+  /**
+   * Format hotel list from Google Maps
+   */
+  static formatHotelList(hotels, location = null, userLocation = null) {
+    if (!hotels || hotels.length === 0) {
+      return {
+        message: '❌ No hotels found in this area.\n\n' +
+                'Try:\n' +
+                '• Searching in a different city\n' +
+                '• Expanding your search radius\n' +
+                '• Browsing by state',
+        keyboard: {
+          inline_keyboard: [
+            [
+              { text: '📍 Browse by State', callback_data: 'hotel_browse_states' },
+              { text: '🔍 Search Again', callback_data: 'hotel_search' }
+            ],
+            [
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]
+          ]
+        }
+      };
+    }
+
+    let message = '🏨 *Hotels Found*\n\n';
+    
+    if (location) {
+      message += `📍 Location: ${location}\n`;
+    }
+    message += `✨ ${hotels.length} hotel${hotels.length > 1 ? 's' : ''} available\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    const keyboard = [];
+    
+    hotels.slice(0, 10).forEach((hotel, index) => {
+      // Hotel rating
+      const stars = this.getRatingStars(hotel.rating);
+      const priceLevel = '💰'.repeat(hotel.priceLevel || 2);
+      
+      // Distance info
+      let distanceText = '';
+      if (hotel.distance !== undefined) {
+        distanceText = hotel.distance < 1 
+          ? `${Math.round(hotel.distance * 1000)}m away`
+          : `${hotel.distance}km away`;
+      }
+      
+      // Status
+      const statusEmoji = hotel.isOpen ? '✅' : '🔴';
+      const statusText = hotel.isOpen ? 'Open Now' : 'Closed';
+      
+      message += `${index + 1}. *${hotel.name}*\n`;
+      message += `   ${stars} (${hotel.rating || 'N/A'}) • ${priceLevel}\n`;
+      if (distanceText) {
+        message += `   📍 ${distanceText} • ${statusEmoji} ${statusText}\n`;
+      } else {
+        message += `   ${statusEmoji} ${statusText}\n`;
+      }
+      message += `   ${hotel.address}\n\n`;
+      
+      // Add button for this hotel
+      keyboard.push([{
+        text: `🏨 ${hotel.name}`,
+        callback_data: `hotel_view_${hotel.id}`
+      }]);
+    });
+
+    if (hotels.length > 10) {
+      message += `\n_...and ${hotels.length - 10} more hotels_\n\n`;
+    }
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `💡 Tap a hotel to see full details`;
+    
+    // Navigation buttons
+    keyboard.push([
+      { text: '🔍 New Search', callback_data: 'hotel_search' },
+      { text: '📍 Nearby Hotels', callback_data: 'hotels_near_me' }
+    ]);
+    keyboard.push([
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+    
+    return {
+      message: message,
+      keyboard: { inline_keyboard: keyboard }
+    };
+  }
+
+  /**
+   * Format hotel details from Google Maps
+   */
+  static formatHotelDetails(hotel, photoUrl = null) {
+    let message = `🏨 *${hotel.name}*\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    // Rating
+    const stars = this.getRatingStars(hotel.rating);
+    message += `⭐ ${stars} ${hotel.rating || 'N/A'}/5.0\n`;
+    if (hotel.totalRatings) {
+      message += `   Based on ${hotel.totalRatings} reviews\n`;
+    }
+    message += `\n`;
+    
+    // Price
+    const HotelDiscoveryService = require('../services/HotelDiscoveryService');
+    const priceRange = HotelDiscoveryService.formatPriceRange(hotel.priceLevel || 2);
+    message += `💰 *Price Range:* ${priceRange}\n\n`;
+    
+    // Address
+    message += `📍 *Address:*\n${hotel.address}\n\n`;
+    
+    // Contact
+    if (hotel.phone) {
+      message += `📞 *Phone:* ${hotel.phone}\n`;
+    }
+    if (hotel.website) {
+      message += `🌐 *Website:* ${hotel.website}\n`;
+    }
+    if (hotel.phone || hotel.website) {
+      message += `\n`;
+    }
+    
+    // Opening hours
+    if (hotel.openingHours) {
+      const isOpen = hotel.openingHours.open_now;
+      message += `🕐 *Status:* ${isOpen ? '✅ Open Now' : '🔴 Closed'}\n`;
+      
+      if (hotel.openingHours.weekday_text && hotel.openingHours.weekday_text.length > 0) {
+        message += `\n*Hours:*\n`;
+        hotel.openingHours.weekday_text.slice(0, 3).forEach(day => {
+          message += `   ${day}\n`;
+        });
+        if (hotel.openingHours.weekday_text.length > 3) {
+          message += `   _...and more_\n`;
+        }
+      }
+      message += `\n`;
+    }
+    
+    // Location coordinates
+    if (hotel.location) {
+      message += `📌 *Coordinates:*\n`;
+      message += `   Lat: ${hotel.location.lat}\n`;
+      message += `   Lng: ${hotel.location.lng}\n\n`;
+    }
+    
+    // Reviews preview
+    if (hotel.reviews && hotel.reviews.length > 0) {
+      message += `💬 *Recent Reviews:*\n\n`;
+      hotel.reviews.slice(0, 2).forEach(review => {
+        const reviewStars = this.getRatingStars(review.rating);
+        message += `   ${reviewStars} "${review.text?.substring(0, 100)}${review.text?.length > 100 ? '...' : ''}"\n`;
+        message += `   - ${review.author_name}\n\n`;
+      });
+    }
+    
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `📱 *Next Steps:*\n`;
+    message += `• Call to check availability\n`;
+    message += `• Visit website to book online\n`;
+    message += `• View on Google Maps for directions`;
+    
+    // Keyboard
+    const keyboard = [];
+    
+    // Map link
+    if (hotel.location) {
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${hotel.location.lat},${hotel.location.lng}`;
+      keyboard.push([{
+        text: '🗺️ View on Google Maps',
+        url: mapsUrl
+      }]);
+    }
+    
+    // Phone call
+    if (hotel.phone) {
+      keyboard.push([{
+        text: `📞 Call ${hotel.name}`,
+        url: `tel:${hotel.phone.replace(/\s/g, '')}`
+      }]);
+    }
+    
+    // Website
+    if (hotel.website) {
+      keyboard.push([{
+        text: '🌐 Visit Website',
+        url: hotel.website
+      }]);
+    }
+    
+    // Navigation
+    keyboard.push([
+      { text: '🔍 Find Similar', callback_data: 'hotel_search' },
+      { text: '📍 Nearby Hotels', callback_data: 'hotels_near_me' }
+    ]);
+    keyboard.push([
+      { text: '🔙 Back to Results', callback_data: 'hotel_back_results' },
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+    
+    return {
+      message: message,
+      keyboard: { inline_keyboard: keyboard },
+      photoUrl: photoUrl
+    };
+  }
+
+  /**
+   * Get hotel categories menu
+   */
+  static getHotelCategoriesMenu() {
+    const HotelDiscoveryService = require('../services/HotelDiscoveryService');
+    const categories = HotelDiscoveryService.HOTEL_CATEGORIES;
+    
+    const keyboard = [];
+    
+    categories.forEach(category => {
+      keyboard.push([{
+        text: category.name,
+        callback_data: `hotel_category_${category.id}`
+      }]);
+    });
+    
+    keyboard.push([
+      { text: '🔙 Back to Hotels', callback_data: 'menu_hotels' },
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+    
+    return {
+      message: '🏨 *Browse Hotels by Category*\n\n' +
+               'Select a category to find hotels:\n\n' +
+               '━━━━━━━━━━━━━━━━━━━━',
+      keyboard: { inline_keyboard: keyboard }
+    };
+  }
 }
 
 module.exports = InterfaceManager;

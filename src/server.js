@@ -70,6 +70,7 @@ const HotelService = require('./services/HotelService');
 const RestaurantDiscoveryService = require('./services/RestaurantDiscoveryService');
 const ShoppingCartService = require('./services/ShoppingCartService');
 const DeliveryTrackingService = require('./services/DeliveryTrackingService');
+const HotelDiscoveryService = require('./services/HotelDiscoveryService');
 const InterfaceManager = require('./config/InterfaceManager');
 
 class TelegramDocumentBot {
@@ -122,8 +123,9 @@ class TelegramDocumentBot {
     // Initialize course service
     this.courseService = new CourseService(this.databaseService);
     
-    // Initialize hotel service
+    // Initialize hotel services
     this.hotelService = new HotelService(this.databaseService);
+    this.hotelDiscovery = HotelDiscoveryService; // Google Maps integration
     
     // Initialize restaurant discovery and ordering services
     this.restaurantDiscovery = RestaurantDiscoveryService;
@@ -1433,6 +1435,14 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       return;
     }
     
+    // Check if user is searching for hotels by city name
+    const expectingHotelCity = await this.conversationManager.getUserData(chatId, 'expecting_hotel_city');
+    if (expectingHotelCity) {
+      await this.conversationManager.setUserData(chatId, 'expecting_hotel_city', false);
+      await this.searchHotelsInCity(chatId, msg.text);
+      return;
+    }
+    
     // Check if user is awaiting homework question input
     const awaitingHomework = await this.conversationManager.getUserData(chatId, 'awaiting_homework_question');
     if (awaitingHomework) {
@@ -1937,9 +1947,13 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.showActiveOrders(chatId);
         break;
 
-      // === HOTEL BOOKING CALLBACKS ===
-      case 'search_hotels':
-        await this.bot.sendMessage(chatId, '🔍 *Search Hotels*\n\nEnter a city or destination:\n\nExamples:\n• Lagos\n• Dubai\n• London\n• New York\n\nOr share your location', { 
+      // === HOTEL BOOKING CALLBACKS (Google Maps Integration) ===
+      case 'hotel_browse_states':
+        await this.showHotelStateSelection(chatId);
+        break;
+
+      case 'hotel_search':
+        await this.bot.sendMessage(chatId, '🔍 *Search Hotels*\n\nEnter a Nigerian city name:\n\nExamples:\n• Lagos\n• Abuja\n• Port Harcourt\n• Kano\n\nOr share your location to find nearby hotels', { 
           parse_mode: 'Markdown',
           reply_markup: {
             keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
@@ -1947,18 +1961,12 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
             one_time_keyboard: true
           }
         });
-        break;
-
-      case 'hotels_by_location':
-        await this.bot.sendMessage(chatId, '🌍 *Search by Location*\n\nEnter city or country name:', { 
-          parse_mode: 'Markdown'
-        });
-        await this.conversationManager.setUserData(chatId, 'expecting_hotel_location', true);
+        await this.conversationManager.setUserData(chatId, 'expecting_hotel_city', true);
         break;
 
       case 'hotels_near_me':
         await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'hotel_search');
-        await this.bot.sendMessage(chatId, '📍 *Find Hotels Near You*\n\nPlease share your location:', {
+        await this.bot.sendMessage(chatId, '📍 *Find Hotels Near You*\n\nShare your location to discover hotels on Google Maps:', {
           parse_mode: 'Markdown',
           reply_markup: {
             keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
@@ -1968,8 +1976,15 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         });
         break;
 
-      case 'hotels_top_rated':
-        await this.bot.sendMessage(chatId, '⭐ *Top Rated Hotels*\n\nSearching for highest rated properties...\n\nUse /search_hotels [city] to find top hotels', { parse_mode: 'Markdown' });
+      case 'search_hotels':
+        await this.bot.sendMessage(chatId, '🔍 *Search Hotels by City*\n\nEnter city name:', { 
+          parse_mode: 'Markdown'
+        });
+        await this.conversationManager.setUserData(chatId, 'expecting_hotel_city', true);
+        break;
+
+      case 'hotels_by_category':
+        await this.showHotelCategories(chatId);
         break;
 
       case 'my_hotel_bookings':
@@ -2266,6 +2281,30 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         } else if (data.startsWith('sort_by_')) {
           const sortOption = data.replace('sort_by_', '');
           await this.sortRestaurants(chatId, sortOption);
+        }
+        // === HOTEL DISCOVERY DYNAMIC CALLBACKS ===
+        else if (data.startsWith('hotel_state_')) {
+          const state = data.replace('hotel_state_', '').replace(/_/g, ' ');
+          await this.showHotelCitiesInState(chatId, state);
+        } else if (data.startsWith('hotel_city_')) {
+          const parts = data.replace('hotel_city_', '').split('_');
+          const state = parts[0];
+          const city = parts.slice(1).join(' ');
+          await this.searchHotelsInCity(chatId, city, state);
+        } else if (data.startsWith('hotel_view_')) {
+          const hotelId = data.replace('hotel_view_', '');
+          await this.showHotelDetails(chatId, hotelId);
+        } else if (data.startsWith('hotel_category_')) {
+          const category = data.replace('hotel_category_', '');
+          await this.filterHotelsByCategory(chatId, category);
+        } else if (data === 'hotel_back_results') {
+          // Get last search from conversation data
+          const lastSearch = await this.conversationManager.getUserData(chatId, 'lastHotelSearch');
+          if (lastSearch) {
+            await this.displayHotelResults(chatId, lastSearch.hotels, lastSearch.location);
+          } else {
+            await this.showHotelStateSelection(chatId);
+          }
         }
         // Handle dynamic study group callbacks
         else if (data.startsWith('sg_join_')) {
@@ -8297,9 +8336,25 @@ Send documents, ask questions, or use commands to get started!
         await this.bot.sendMessage(chatId, '📍 Location received! 🍽️ Finding nearby restaurants...');
         await this.searchRestaurantsByLocation(chatId, latitude, longitude);
       } else {
-        // Default to restaurant search
-        await this.bot.sendMessage(chatId, '📍 Location received! Finding nearby restaurants...');
-        await this.searchRestaurantsByLocation(chatId, latitude, longitude);
+        // No specific context - ask user what they're looking for
+        await this.bot.sendMessage(chatId, 
+          '📍 *Location Received*\n\nWhat would you like to find nearby?',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🏨 Hotels', callback_data: 'hotels_near_me' },
+                  { text: '🍽️ Restaurants', callback_data: 'browse_restaurants' }
+                ],
+                [
+                  { text: '🏢 Businesses', callback_data: 'marketplace_hub' },
+                  { text: '🏠 Main Menu', callback_data: 'main_menu' }
+                ]
+              ]
+            }
+          }
+        );
       }
       
       // Clear awaiting location flag
@@ -8397,58 +8452,69 @@ Send documents, ask questions, or use commands to get started!
 
   async searchHotelsByLocation(chatId, latitude, longitude) {
     try {
-      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Finding hotels near you...');
+      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Finding hotels near you on Google Maps...');
       
       try {
+        // Get Google Maps API key from environment
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY || null;
+        
+        // Use HotelDiscoveryService to find nearby hotels via Google Maps
+        const hotels = await this.hotelDiscovery.findNearbyHotelsGoogle(
+          latitude,
+          longitude,
+          5000, // 5km radius
+          apiKey
+        );
+
         // Get city name from coordinates using reverse geocoding
-        const response = await require('axios').get('https://nominatim.openstreetmap.org/reverse', {
-          params: {
-            lat: latitude,
-            lon: longitude,
-            format: 'json'
-          },
-          headers: {
-            'User-Agent': 'TelegramBot/1.0'
-          }
-        });
-
-        const locationName = response.data.address?.city || 
-                           response.data.address?.town || 
-                           response.data.address?.state || 
-                           'your location';
-
-        // Search hotels near coordinates
-        const hotels = await this.hotelService.searchHotels({
-          latitude: latitude,
-          longitude: longitude,
-          maxDistance: 50, // 50km radius
-          limit: 15
-        });
+        let locationName = 'your location';
+        try {
+          const response = await require('axios').get('https://nominatim.openstreetmap.org/reverse', {
+            params: {
+              lat: latitude,
+              lon: longitude,
+              format: 'json'
+            },
+            headers: {
+              'User-Agent': 'TelegramBot/1.0'
+            }
+          });
+          locationName = response.data.address?.city || 
+                        response.data.address?.town || 
+                        response.data.address?.state || 
+                        'your location';
+        } catch (geoError) {
+          console.warn('⚠️ Geocoding failed, using generic location name');
+        }
 
         await this.bot.deleteMessage(chatId, loadingMsg.message_id);
 
-        if (hotels.length === 0) {
-          await this.bot.sendMessage(chatId,
-            `❌ No hotels found within 50km of your location.\n\n` +
-            `📍 Location: ${locationName}\n\n` +
-            'Try:\n' +
-            '• Searching in a nearby city\n' +
-            '• Expanding search radius\n' +
-            '• Using city name instead',
-            {
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: '🔍 Search by City', callback_data: 'search_hotels' },
-                  { text: '🏠 Main Menu', callback_data: 'main_menu' }
-                ]]
-              }
-            }
-          );
-          return;
-        }
+        // Store search results for back navigation
+        await this.conversationManager.setUserData(chatId, 'lastHotelSearch', {
+          hotels: hotels,
+          location: locationName,
+          userLocation: { lat: latitude, lng: longitude }
+        });
 
-        // Display hotels with distance
-        await this.displayHotelResults(chatId, hotels, locationName, true);
+        // Display results using InterfaceManager
+        const result = InterfaceManager.formatHotelList(
+          hotels, 
+          locationName, 
+          { lat: latitude, lng: longitude }
+        );
+
+        await this.bot.sendMessage(chatId, result.message, {
+          parse_mode: 'Markdown',
+          reply_markup: result.keyboard
+        });
+
+        if (hotels.length > 0 && !apiKey) {
+          await this.bot.sendMessage(chatId, 
+            '⚠️ *Note:* Google Maps API is not configured. Showing sample data.\n\n' +
+            '💡 Administrator: Set GOOGLE_MAPS_API_KEY environment variable for real hotel data.',
+            { parse_mode: 'Markdown' }
+          );
+        }
       } catch (error) {
         await this.bot.deleteMessage(chatId, loadingMsg.message_id);
         throw error;
@@ -8456,12 +8522,12 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error searching hotels by location:', error);
       await this.bot.sendMessage(chatId,
-        '❌ Error finding nearby hotels. Please try searching by city name instead.\n\n' +
-        'Use `/search_hotels <city>`',
+        '❌ Error finding nearby hotels. Please try again or browse by state.\n\n' +
+        'Use /hotels to see options',
         {
           reply_markup: {
             inline_keyboard: [[
-              { text: '🔍 Search by City', callback_data: 'search_hotels' },
+              { text: '� Browse by State', callback_data: 'hotel_browse_states' },
               { text: '🏠 Main Menu', callback_data: 'main_menu' }
             ]]
           }
@@ -9726,6 +9792,185 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error showing businesses:', error);
       await this.bot.sendMessage(chatId, '⚠️ Error loading businesses. Please try again.');
+    }
+  }
+
+  // ===== NEW HOTEL DISCOVERY METHODS (Google Maps Integration) =====
+
+  async showHotelStateSelection(chatId) {
+    try {
+      const result = InterfaceManager.getHotelStateSelectionMenu();
+      await this.bot.sendMessage(chatId, result.message, {
+        parse_mode: 'Markdown',
+        reply_markup: result.keyboard
+      });
+    } catch (error) {
+      console.error('Error showing hotel state selection:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading states. Please try again.');
+    }
+  }
+
+  async showHotelCitiesInState(chatId, stateName) {
+    try {
+      const stateInfo = await this.hotelDiscovery.browseHotelsByState(stateName);
+      
+      if (!stateInfo.success) {
+        await this.bot.sendMessage(chatId, 
+          `❌ State "${stateName}" not found.\n\nPlease select a valid Nigerian state.`,
+          {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🔙 Back to States', callback_data: 'hotel_browse_states' }
+              ]]
+            }
+          }
+        );
+        return;
+      }
+
+      const result = InterfaceManager.getHotelCitySelectionMenu(stateName, stateInfo.cities);
+      await this.bot.sendMessage(chatId, result.message, {
+        parse_mode: 'Markdown',
+        reply_markup: result.keyboard
+      });
+    } catch (error) {
+      console.error('Error showing hotel cities:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading cities. Please try again.');
+    }
+  }
+
+  async searchHotelsInCity(chatId, cityName, stateName = null) {
+    try {
+      const loadingMsg = await this.bot.sendMessage(chatId, `🔍 Searching for hotels in ${cityName}...`);
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY || null;
+      const result = await this.hotelDiscovery.searchHotelsInCity(cityName, stateName, apiKey);
+
+      await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+
+      if (!result.success) {
+        await this.bot.sendMessage(chatId, 
+          `❌ ${result.error}\n\n💡 ${result.suggestion}`,
+          {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🔙 Back to States', callback_data: 'hotel_browse_states' },
+                { text: '🔍 Search Again', callback_data: 'hotel_search' }
+              ]]
+            }
+          }
+        );
+        return;
+      }
+
+      // Store search results
+      await this.conversationManager.setUserData(chatId, 'lastHotelSearch', {
+        hotels: result.hotels,
+        location: `${result.city}, ${result.state}`
+      });
+
+      // Display hotels
+      const displayResult = InterfaceManager.formatHotelList(
+        result.hotels,
+        `${result.city}, ${result.state}`
+      );
+
+      await this.bot.sendMessage(chatId, displayResult.message, {
+        parse_mode: 'Markdown',
+        reply_markup: displayResult.keyboard
+      });
+
+      if (result.hotels.length > 0 && !apiKey) {
+        await this.bot.sendMessage(chatId, 
+          '⚠️ *Note:* Google Maps API not configured. Showing sample data.\n\n' +
+          '💡 Admin: Set GOOGLE_MAPS_API_KEY for real hotels.',
+          { parse_mode: 'Markdown' }
+        );
+      }
+    } catch (error) {
+      console.error('Error searching hotels in city:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching hotels. Please try again.');
+    }
+  }
+
+  async showHotelDetails(chatId, hotelId) {
+    try {
+      const loadingMsg = await this.bot.sendMessage(chatId, '📋 Loading hotel details...');
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY || null;
+      const hotel = await this.hotelDiscovery.getHotelDetails(hotelId, apiKey);
+
+      await this.bot.deleteMessage(chatId, loadingMsg.message_id);
+
+      // Get photo URL if available
+      let photoUrl = null;
+      if (hotel.photos && hotel.photos.length > 0 && apiKey) {
+        photoUrl = this.hotelDiscovery.getPhotoUrl(hotel.photos[0], apiKey, 800);
+      }
+
+      const result = InterfaceManager.formatHotelDetails(hotel, photoUrl);
+
+      // Send photo if available
+      if (photoUrl) {
+        try {
+          await this.bot.sendPhoto(chatId, photoUrl, {
+            caption: result.message,
+            parse_mode: 'Markdown',
+            reply_markup: result.keyboard
+          });
+        } catch (photoError) {
+          console.warn('⚠️ Failed to send hotel photo, sending text instead');
+          await this.bot.sendMessage(chatId, result.message, {
+            parse_mode: 'Markdown',
+            reply_markup: result.keyboard
+          });
+        }
+      } else {
+        await this.bot.sendMessage(chatId, result.message, {
+          parse_mode: 'Markdown',
+          reply_markup: result.keyboard
+        });
+      }
+    } catch (error) {
+      console.error('Error showing hotel details:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading hotel details. Please try again.');
+    }
+  }
+
+  async showHotelCategories(chatId) {
+    try {
+      const result = InterfaceManager.getHotelCategoriesMenu();
+      await this.bot.sendMessage(chatId, result.message, {
+        parse_mode: 'Markdown',
+        reply_markup: result.keyboard
+      });
+    } catch (error) {
+      console.error('Error showing hotel categories:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading categories. Please try again.');
+    }
+  }
+
+  async filterHotelsByCategory(chatId, category) {
+    try {
+      await this.bot.sendMessage(chatId, 
+        `🏨 *${category} Hotels*\n\n` +
+        'This feature allows you to filter hotels by category.\n\n' +
+        '💡 Use location-based search or browse by state to find hotels.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '📍 Find Nearby', callback_data: 'hotels_near_me' },
+              { text: '🗺️ Browse States', callback_data: 'hotel_browse_states' }
+            ], [
+              { text: '🏠 Main Menu', callback_data: 'main_menu' }
+            ]]
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error filtering hotels by category:', error);
+      await this.bot.sendMessage(chatId, '❌ Error filtering hotels. Please try again.');
     }
   }
 
