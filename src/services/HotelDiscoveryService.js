@@ -64,6 +64,7 @@ class HotelDiscoveryService {
     'Edo': {
       cities: [
         { name: 'Benin City', lat: 6.3350, lng: 5.6037 },
+        { name: 'Benin', lat: 6.3350, lng: 5.6037 }, // Same as Benin City
         { name: 'GRA', lat: 6.3176, lng: 5.6145 }
       ]
     },
@@ -142,6 +143,71 @@ class HotelDiscoveryService {
     'Bayelsa': {
       cities: [
         { name: 'Yenagoa', lat: 4.9267, lng: 6.2676 }
+      ]
+    },
+    'Benue': {
+      cities: [
+        { name: 'Makurdi', lat: 7.7364, lng: 8.5219 }
+      ]
+    },
+    'Borno': {
+      cities: [
+        { name: 'Maiduguri', lat: 11.8333, lng: 13.1500 }
+      ]
+    },
+    'Ekiti': {
+      cities: [
+        { name: 'Ado-Ekiti', lat: 7.6163, lng: 5.2206 }
+      ]
+    },
+    'Gombe': {
+      cities: [
+        { name: 'Gombe', lat: 10.2897, lng: 11.1706 }
+      ]
+    },
+    'Jigawa': {
+      cities: [
+        { name: 'Dutse', lat: 11.7568, lng: 9.3367 }
+      ]
+    },
+    'Kebbi': {
+      cities: [
+        { name: 'Birnin Kebbi', lat: 12.4539, lng: 4.1975 }
+      ]
+    },
+    'Kogi': {
+      cities: [
+        { name: 'Lokoja', lat: 7.7974, lng: 6.7406 }
+      ]
+    },
+    'Nasarawa': {
+      cities: [
+        { name: 'Lafia', lat: 8.4935, lng: 8.5152 }
+      ]
+    },
+    'Niger': {
+      cities: [
+        { name: 'Minna', lat: 9.6139, lng: 6.5569 }
+      ]
+    },
+    'Sokoto': {
+      cities: [
+        { name: 'Sokoto', lat: 13.0622, lng: 5.2339 }
+      ]
+    },
+    'Taraba': {
+      cities: [
+        { name: 'Jalingo', lat: 8.8959, lng: 11.3596 }
+      ]
+    },
+    'Yobe': {
+      cities: [
+        { name: 'Damaturu', lat: 11.7473, lng: 11.9608 }
+      ]
+    },
+    'Zamfara': {
+      cities: [
+        { name: 'Gusau', lat: 12.1642, lng: 6.6584 }
       ]
     }
   };
@@ -357,21 +423,41 @@ class HotelDiscoveryService {
    * @returns {Object|null} City data with coordinates
    */
   static getCityCoordinates(cityName, stateName = null) {
-    const cityLower = cityName.toLowerCase();
+    const cityLower = cityName.toLowerCase().trim();
 
     // Search in specific state
     if (stateName && this.NIGERIAN_STATES[stateName]) {
-      const city = this.NIGERIAN_STATES[stateName].cities.find(
+      // Exact match first
+      let city = this.NIGERIAN_STATES[stateName].cities.find(
         c => c.name.toLowerCase() === cityLower
+      );
+      if (city) {
+        return { ...city, state: stateName };
+      }
+      
+      // Partial match
+      city = this.NIGERIAN_STATES[stateName].cities.find(
+        c => c.name.toLowerCase().includes(cityLower) || cityLower.includes(c.name.toLowerCase())
       );
       if (city) {
         return { ...city, state: stateName };
       }
     }
 
-    // Search across all states
+    // Search across all states - Exact match first
     for (const [state, data] of Object.entries(this.NIGERIAN_STATES)) {
       const city = data.cities.find(c => c.name.toLowerCase() === cityLower);
+      if (city) {
+        return { ...city, state: state };
+      }
+    }
+    
+    // Search across all states - Partial match
+    for (const [state, data] of Object.entries(this.NIGERIAN_STATES)) {
+      const city = data.cities.find(c => 
+        c.name.toLowerCase().includes(cityLower) || 
+        cityLower.includes(c.name.toLowerCase())
+      );
       if (city) {
         return { ...city, state: state };
       }
