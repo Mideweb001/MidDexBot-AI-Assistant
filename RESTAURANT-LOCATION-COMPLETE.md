@@ -289,10 +289,15 @@ const distance = R * c;
 ### Step 1: Add API Key to Railway
 
 ```bash
-railway variables set GOOGLE_MAPS_API_KEY=AIzaSyA_emBvG-_Q1szvRUz9CiYEKdheJ06HHEI
+railway variables set GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY_HERE
 ```
 
-✅ **Already done!**
+⚠️ **Important:** Replace `YOUR_GOOGLE_MAPS_API_KEY_HERE` with your actual API key from Google Cloud Console.
+
+**Get your API key:**
+1. Go to: https://console.cloud.google.com/apis/credentials
+2. Create or copy your API key
+3. Add to Railway: `railway variables set GOOGLE_MAPS_API_KEY=your_key`
 
 ### Step 2: Commit Changes
 

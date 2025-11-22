@@ -10,12 +10,20 @@ This guide explains how to populate your MidDexBot database with real Nigerian r
 
 ### 1. Setup Google Maps API Key
 
-You already have: `AIzaSyA_emBvG-_Q1szvRUz9CiYEKdheJ06HHEI`
+**Get your Google Maps API key:**
+1. Go to: https://console.cloud.google.com/apis/credentials
+2. Create a new API key or use existing one
+3. Enable these APIs:
+   - Places API
+   - Maps JavaScript API
+   - Geocoding API
 
-Make sure it's in Railway environment variables:
+**Add to Railway:**
 ```bash
-railway variables set GOOGLE_MAPS_API_KEY=AIzaSyA_emBvG-_Q1szvRUz9CiYEKdheJ06HHEI
+railway variables set GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE
 ```
+
+⚠️ **Never commit API keys to GitHub!**
 
 ### 2. Run Restaurant Population Script
 
@@ -314,8 +322,9 @@ After running the population script:
 **Cause:** GOOGLE_MAPS_API_KEY not set
 **Solution:** 
 ```bash
-railway variables set GOOGLE_MAPS_API_KEY=AIzaSyA_emBvG-_Q1szvRUz9CiYEKdheJ06HHEI
+railway variables set GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE
 ```
+Get your API key from: https://console.cloud.google.com/apis/credentials
 
 ### Issue 3: "Duplicate restaurants"
 
