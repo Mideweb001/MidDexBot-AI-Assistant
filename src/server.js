@@ -1443,6 +1443,14 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       return;
     }
     
+    // Check if user is searching for restaurants by city/location name
+    const awaitingRestaurantLocation = await this.conversationManager.getUserData(chatId, 'awaitingLocation');
+    if (awaitingRestaurantLocation === 'restaurant_search') {
+      await this.conversationManager.setUserData(chatId, 'awaitingLocation', null);
+      await this.searchRestaurantsByCity(chatId, msg.text);
+      return;
+    }
+    
     // Check if user is awaiting homework question input
     const awaitingHomework = await this.conversationManager.getUserData(chatId, 'awaiting_homework_question');
     if (awaitingHomework) {
@@ -9058,6 +9066,107 @@ Send documents, ask questions, or use commands to get started!
       console.error('Error searching restaurants by location:', error);
       await this.bot.sendMessage(chatId, 
         '❌ Error finding nearby restaurants. Please try again.',
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 Try Again', callback_data: 'browse_restaurants' },
+              { text: '🏠 Main Menu', callback_data: 'menu_main' }
+            ]]
+          }
+        }
+      );
+    }
+  }
+
+  async searchRestaurantsByCity(chatId, cityName) {
+    try {
+      const loadingMsg = await this.bot.sendMessage(chatId, `🔍 Searching for restaurants in ${cityName}...`);
+      
+      // Search restaurants by state/city in database
+      const result = await this.restaurantDiscovery.browseRestaurantsByState(cityName, {
+        sortBy: 'rating',
+        limit: 20
+      });
+      
+      await this.bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+      
+      if (!result.success || !result.restaurants || result.restaurants.length === 0) {
+        await this.bot.sendMessage(chatId, 
+          `😕 *No Restaurants Found in ${cityName}*\n\n` +
+          'We couldn\'t find any restaurants in this location.\n\n' +
+          'This might be because:\n' +
+          '• Database is still being populated\n' +
+          '• City name not recognized\n' +
+          '• No restaurants registered yet\n\n' +
+          '*Try these alternatives:*',
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '📍 Share Location', callback_data: 'browse_restaurants' },
+                  { text: '🗺️ Browse by State', callback_data: 'browse_by_state' }
+                ],
+                [
+                  { text: '🍴 Browse by Cuisine', callback_data: 'browse_by_cuisine' }
+                ],
+                [
+                  { text: '📱 Register Restaurant', callback_data: 'register_restaurant' },
+                  { text: '🏠 Main Menu', callback_data: 'menu_main' }
+                ]
+              ]
+            }
+          }
+        );
+        return;
+      }
+
+      const restaurants = result.restaurants;
+      const isMockData = result.isMockData || false;
+      
+      // Build message with restaurant list
+      let message = `🍽️ *Restaurants in ${cityName}*\n\n`;
+      if (isMockData) {
+        message += `📊 Showing sample restaurants (database is being populated)\n\n`;
+      }
+      message += `📍 Found ${restaurants.length} restaurant${restaurants.length > 1 ? 's' : ''}\n\n`;
+      
+      restaurants.slice(0, 10).forEach((restaurant, index) => {
+        const rating = restaurant.rating || 0;
+        const ratingStars = '⭐'.repeat(Math.round(rating));
+        message += `${index + 1}. *${restaurant.name}*\n`;
+        message += `   ${ratingStars} ${rating.toFixed(1)} • ${restaurant.cuisine_type || restaurant.cuisine}\n`;
+        if (restaurant.area) {
+          message += `   📍 ${restaurant.area}\n`;
+        }
+        message += `   💰 ₦${restaurant.delivery_fee} delivery • Min: ₦${restaurant.minimum_order}\n\n`;
+      });
+      
+      message += `\n💡 Tap a restaurant to see details`;
+      
+      const keyboard = [];
+      restaurants.slice(0, 10).forEach(restaurant => {
+        const displayName = restaurant.name.length > 30 ? restaurant.name.substring(0, 27) + '...' : restaurant.name;
+        keyboard.push([{
+          text: `🍽️ ${displayName}`,
+          callback_data: restaurant.id ? `restaurant_details_${restaurant.id}` : `browse_restaurants`
+        }]);
+      });
+      
+      keyboard.push([
+        { text: '🔄 Search Again', callback_data: 'browse_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'menu_main' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+      
+    } catch (error) {
+      console.error('Error searching restaurants by city:', error);
+      await this.bot.sendMessage(chatId, 
+        `❌ Error searching restaurants in ${cityName}. Please try again.`,
         {
           reply_markup: {
             inline_keyboard: [[
