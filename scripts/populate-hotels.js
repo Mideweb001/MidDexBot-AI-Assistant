@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Restaurant Database Population Script
+ * Hotel Database Population Script
  * 
- * This script fetches real Nigerian restaurants from Google Places API
- * and populates the database with comprehensive restaurant data.
+ * This script fetches real Nigerian hotels from Google Places API
+ * and populates the database with comprehensive hotel data.
  * 
  * Usage:
- *   node scripts/populate-restaurants.js
+ *   node scripts/populate-hotels.js
  * 
  * Environment Variables Required:
  *   GOOGLE_MAPS_API_KEY - Your Google Maps API key
@@ -15,7 +15,7 @@
 
 require('dotenv').config();
 const axios = require('axios');
-const { sequelize, Restaurant, User, MenuItem } = require('../src/models');
+const { sequelize, Hotel, User } = require('../src/models');
 
 // ALL 36 Nigerian States + FCT (Capital cities)
 const NIGERIAN_CITIES = [
@@ -71,22 +71,15 @@ const NIGERIAN_CITIES = [
   { name: 'Damaturu', state: 'Yobe', lat: 11.7468, lng: 11.9612, radius: 8000 },
 ];
 
-// Cuisine types to search for
-const CUISINE_TYPES = [
-  'restaurant',
-  'nigerian restaurant',
-  'african restaurant',
-  'fast food',
-  'cafe',
-  'bar',
-  'pizza',
-  'chinese restaurant',
-  'indian restaurant',
-  'italian restaurant',
-  'american restaurant',
+// Hotel search types
+const HOTEL_TYPES = [
+  'hotel',
+  'lodging',
+  'resort',
+  'guest_house',
 ];
 
-class RestaurantPopulator {
+class HotelPopulator {
   constructor() {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY;
     this.systemUser = null;
@@ -96,7 +89,7 @@ class RestaurantPopulator {
   }
 
   async initialize() {
-    console.log('\n🚀 Restaurant Database Populator Started\n');
+    console.log('\n🏨 Hotel Database Populator Started\n');
     console.log('=' .repeat(60));
 
     if (!this.apiKey) {
@@ -143,8 +136,7 @@ class RestaurantPopulator {
         params: {
           location: `${city.lat},${city.lng}`,
           radius: city.radius,
-          type: 'restaurant',
-          keyword: type,
+          type: type,
           key: this.apiKey
         }
       });
@@ -170,7 +162,7 @@ class RestaurantPopulator {
       const response = await axios.get(url, {
         params: {
           place_id: placeId,
-          fields: 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,price_level,types',
+          fields: 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,price_level,types',
           key: this.apiKey
         }
       });
@@ -185,87 +177,83 @@ class RestaurantPopulator {
     }
   }
 
-  determineCuisineType(place) {
+  determineHotelCategory(place) {
     const types = place.types || [];
     const name = place.name.toLowerCase();
+    const rating = place.rating || 0;
 
-    // Nigerian/African
-    if (name.includes('bukka') || name.includes('mama put') || 
-        name.includes('amala') || name.includes('jollof') ||
-        name.includes('suya') || name.includes('nigerian') ||
-        name.includes('african')) {
-      return 'Nigerian';
+    // Luxury Hotels (5-star equivalent)
+    if (rating >= 4.5 || name.includes('hilton') || name.includes('sheraton') ||
+        name.includes('intercontinental') || name.includes('radisson') ||
+        name.includes('eko hotel') || name.includes('transcorp')) {
+      return 'Luxury';
     }
 
-    // Fast Food
-    if (types.includes('meal_takeaway') || types.includes('fast_food') ||
-        name.includes('chicken') || name.includes('shawarma') ||
-        name.includes('burger') || name.includes('kfc') || 
-        name.includes('domino') || name.includes('subway')) {
-      return 'Fast Food';
+    // Business Hotels
+    if (name.includes('business') || name.includes('executive') || 
+        name.includes('suites')) {
+      return 'Business';
     }
 
-    // Chinese
-    if (types.includes('chinese_restaurant') || name.includes('chinese') || 
-        name.includes('wok') || name.includes('dragon')) {
-      return 'Chinese';
+    // Budget Hotels
+    if (types.includes('guest_house') || name.includes('guest') ||
+        name.includes('lodge') || name.includes('inn') || rating < 3.5) {
+      return 'Budget';
     }
 
-    // Indian
-    if (types.includes('indian_restaurant') || name.includes('indian') || 
-        name.includes('curry') || name.includes('tandoori')) {
-      return 'Indian';
+    // Resort/Leisure
+    if (types.includes('resort') || name.includes('resort') || 
+        name.includes('leisure')) {
+      return 'Resort';
     }
 
-    // Italian
-    if (types.includes('italian_restaurant') || name.includes('pizza') || 
-        name.includes('pasta') || name.includes('italian')) {
-      return 'Italian';
-    }
-
-    // Continental
-    if (types.includes('restaurant') || types.includes('fine_dining')) {
-      return 'Continental';
-    }
-
-    // Cafe/Bakery
-    if (types.includes('cafe') || types.includes('bakery') || 
-        name.includes('cafe') || name.includes('bakery')) {
-      return 'Cafe';
-    }
-
-    return 'General';
+    // Default to Standard
+    return 'Standard';
   }
 
-  formatOperatingHours(openingHours) {
-    if (!openingHours || !openingHours.periods) return {};
+  determinePriceRange(place) {
+    const category = this.determineHotelCategory(place);
+    const priceLevel = place.price_level || 2;
 
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const formatted = {};
-
-    try {
-      openingHours.periods.forEach(period => {
-        const dayIndex = period.open.day;
-        const dayName = days[dayIndex];
-        
-        if (period.open && period.close) {
-          formatted[dayName] = {
-            open: `${period.open.time.substring(0, 2)}:${period.open.time.substring(2)}`,
-            close: `${period.close.time.substring(0, 2)}:${period.close.time.substring(2)}`
-          };
-        }
-      });
-    } catch (error) {
-      console.warn('⚠️  Error formatting hours:', error.message);
+    switch (category) {
+      case 'Luxury':
+        return { min: 35000, max: 150000 }; // ₦35,000 - ₦150,000 per night
+      case 'Business':
+        return { min: 20000, max: 60000 }; // ₦20,000 - ₦60,000
+      case 'Standard':
+        return { min: 12000, max: 35000 }; // ₦12,000 - ₦35,000
+      case 'Budget':
+        return { min: 5000, max: 15000 }; // ₦5,000 - ₦15,000
+      case 'Resort':
+        return { min: 25000, max: 80000 }; // ₦25,000 - ₦80,000
+      default:
+        return { min: 10000, max: 30000 };
     }
-
-    return formatted;
   }
 
-  async saveRestaurant(place, city, details) {
+  generateAmenities(category, place) {
+    const baseAmenities = ['WiFi', 'Air Conditioning', 'TV', 'Room Service'];
+    
+    switch (category) {
+      case 'Luxury':
+        return [...baseAmenities, 'Swimming Pool', 'Spa', 'Gym', 'Restaurant', 'Bar', 'Concierge', 'Airport Shuttle', 'Conference Rooms'];
+      case 'Business':
+        return [...baseAmenities, 'Business Center', 'Meeting Rooms', 'Conference Facilities', 'Gym', 'Restaurant'];
+      case 'Standard':
+        return [...baseAmenities, 'Restaurant', 'Parking', 'Laundry'];
+      case 'Budget':
+        return ['WiFi', 'TV', 'Fan/AC', 'Parking'];
+      case 'Resort':
+        return [...baseAmenities, 'Swimming Pool', 'Beach Access', 'Spa', 'Restaurant', 'Bar', 'Activities'];
+      default:
+        return baseAmenities;
+    }
+  }
+
+  async saveHotel(place, city, details) {
     try {
-      // Check if restaurant already exists by name and approximate location
-      const existing = await Restaurant.findOne({
+      // Check if hotel already exists
+      const existing = await Hotel.findOne({
         where: {
           name: place.name,
           latitude: {
@@ -288,39 +276,44 @@ class RestaurantPopulator {
         return false;
       }
 
-      // Prepare restaurant data
-      const cuisineType = this.determineCuisineType(place);
-      const operatingHours = details?.opening_hours ? 
-        this.formatOperatingHours(details.opening_hours) : {};
+      const category = this.determineHotelCategory(place);
+      const priceRange = this.determinePriceRange(place);
+      const amenities = this.generateAmenities(category, place);
 
-      const restaurantData = {
+      const hotelData = {
         owner_id: this.systemUser.id,
         name: place.name,
-        description: `${cuisineType} restaurant in ${city.name}, ${city.state}`,
+        description: `${category} hotel in ${city.name}, ${city.state}. Google Maps rating: ${place.rating || 'N/A'}`,
         address: place.vicinity || details?.formatted_address || `${city.name}, ${city.state}`,
+        city: city.name,
+        state: city.state,
+        country: 'Nigeria',
         latitude: place.geometry.location.lat,
         longitude: place.geometry.location.lng,
         phone: details?.formatted_phone_number || null,
-        email: null, // Not available from API
-        cuisine_type: cuisineType,
-        operating_hours: operatingHours,
-        delivery_radius: 5.0, // Default 5km
-        delivery_fee: Math.floor(Math.random() * 500) + 300, // 300-800 NGN
-        minimum_order: Math.floor(Math.random() * 2000) + 1000, // 1000-3000 NGN
+        email: null,
+        website: details?.website || null,
+        category: category,
+        star_rating: Math.min(5, Math.ceil((place.rating || 3) / 0.9)), // Convert 0-5 rating to star rating
+        price_per_night: Math.floor((priceRange.min + priceRange.max) / 2),
+        total_rooms: Math.floor(Math.random() * 50) + 20, // 20-70 rooms (estimated)
+        amenities: amenities,
+        check_in_time: '14:00',
+        check_out_time: '12:00',
+        cancellation_policy: 'Free cancellation up to 24 hours before check-in',
         rating: place.rating || 0,
         total_reviews: place.user_ratings_total || 0,
         is_active: true,
-        is_verified: place.rating >= 4.0, // Auto-verify highly rated places
-        logo_url: null,
-        cover_image_url: null,
-        tags: [city.name, city.state, cuisineType.toLowerCase()],
-        features: ['delivery', 'pickup', 'dine-in']
+        is_verified: place.rating >= 4.0,
+        images: [],
+        google_place_id: place.place_id || null,
+        google_maps_url: place.place_id ? `https://www.google.com/maps/place/?q=place_id:${place.place_id}` : null
       };
 
-      await Restaurant.create(restaurantData);
+      await Hotel.create(hotelData);
       this.totalAdded++;
       
-      console.log(`  ✅ ${place.name} - ${cuisineType} - ⭐${place.rating || 'N/A'}`);
+      console.log(`  ✅ ${place.name} - ${category} - ⭐${place.rating || 'N/A'} - ₦${hotelData.price_per_night}/night`);
       return true;
 
     } catch (error) {
@@ -335,8 +328,9 @@ class RestaurantPopulator {
     console.log('-'.repeat(60));
 
     let cityTotal = 0;
+    const allPlaces = new Set(); // Track unique places by place_id
 
-    for (const type of CUISINE_TYPES) {
+    for (const type of HOTEL_TYPES) {
       const places = await this.fetchPlacesInCity(city, type);
       
       if (places.length === 0) continue;
@@ -344,22 +338,26 @@ class RestaurantPopulator {
       console.log(`\n🔍 Found ${places.length} places for "${type}"`);
 
       for (const place of places) {
-        // Get detailed information for better accuracy
+        // Skip duplicates
+        if (allPlaces.has(place.place_id)) continue;
+        allPlaces.add(place.place_id);
+
+        // Get detailed information
         let details = null;
         if (place.place_id) {
           details = await this.getPlaceDetails(place.place_id);
           await this.delay(100); // Respect API rate limits
         }
 
-        const saved = await this.saveRestaurant(place, city, details);
+        const saved = await this.saveHotel(place, city, details);
         if (saved) cityTotal++;
       }
 
-      // Delay between cuisine type searches
+      // Delay between type searches
       await this.delay(500);
     }
 
-    console.log(`\n✅ ${city.name} Complete: ${cityTotal} restaurants added\n`);
+    console.log(`\n✅ ${city.name} Complete: ${cityTotal} hotels added\n`);
   }
 
   async delay(ms) {
@@ -380,61 +378,72 @@ class RestaurantPopulator {
 
   async generateReport() {
     console.log('\n' + '='.repeat(60));
-    console.log('📊 POPULATION REPORT');
+    console.log('📊 HOTEL POPULATION REPORT');
     console.log('='.repeat(60));
 
-    const totalRestaurants = await Restaurant.count();
-    const byState = await Restaurant.findAll({
+    const totalHotels = await Hotel.count();
+    const byCategory = await Hotel.findAll({
       attributes: [
+        'category',
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        'tags'
+        [sequelize.fn('AVG', sequelize.col('price_per_night')), 'avg_price']
       ],
-      group: ['tags'],
-      raw: true
-    });
-
-    const byCuisine = await Restaurant.findAll({
-      attributes: [
-        'cuisine_type',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['cuisine_type'],
+      group: ['category'],
       order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
       raw: true
     });
 
+    const byState = await Hotel.findAll({
+      attributes: [
+        'state',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['state'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      limit: 10,
+      raw: true
+    });
+
     console.log('\n📈 Statistics:');
-    console.log(`   Total Restaurants in Database: ${totalRestaurants}`);
+    console.log(`   Total Hotels in Database: ${totalHotels}`);
     console.log(`   ✅ Added this session: ${this.totalAdded}`);
     console.log(`   ⏭️  Skipped (duplicates): ${this.totalSkipped}`);
     console.log(`   ❌ Errors: ${this.errors}`);
 
-    console.log('\n🍽️  By Cuisine Type:');
-    byCuisine.forEach(item => {
-      console.log(`   ${item.cuisine_type}: ${item.count}`);
+    console.log('\n🏨 By Category:');
+    byCategory.forEach(item => {
+      const avgPrice = item.avg_price ? `₦${Math.floor(item.avg_price).toLocaleString()}` : 'N/A';
+      console.log(`   ${item.category}: ${item.count} hotels (avg: ${avgPrice}/night)`);
     });
 
-    console.log('\n📍 Coverage:');
+    console.log('\n📍 Top 10 States by Hotel Count:');
+    byState.forEach(item => {
+      console.log(`   ${item.state}: ${item.count} hotels`);
+    });
+
+    console.log('\n🗺️  Coverage:');
     console.log(`   Cities processed: ${NIGERIAN_CITIES.length}`);
     
-    // Get restaurants with valid coordinates
-    const withCoordinates = await Restaurant.count({
+    const withCoordinates = await Hotel.count({
       where: {
         latitude: { [sequelize.Sequelize.Op.ne]: null },
         longitude: { [sequelize.Sequelize.Op.ne]: null }
       }
     });
-    console.log(`   Restaurants with GPS coordinates: ${withCoordinates}`);
+    console.log(`   Hotels with GPS coordinates: ${withCoordinates}`);
+
+    const verified = await Hotel.count({ where: { is_verified: true } });
+    console.log(`   Verified hotels: ${verified}`);
 
     console.log('\n' + '='.repeat(60));
-    console.log('✅ Database population complete!');
+    console.log('✅ Hotel database population complete!');
     console.log('='.repeat(60) + '\n');
   }
 }
 
 // Run the populator
 (async () => {
-  const populator = new RestaurantPopulator();
+  const populator = new HotelPopulator();
   
   try {
     await populator.run();

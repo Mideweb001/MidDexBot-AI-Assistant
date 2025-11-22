@@ -614,10 +614,18 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showMainMenu(chatId);
     });
 
-    // Hotel booking menu command
-    this.bot.onText(/\/hotels?/, async (msg) => {
+    // Unified /hotel command - shows state selection menu
+    this.bot.onText(/\/hotels?(?:\s+(.+))?/, async (msg, match) => {
       const chatId = msg.chat.id;
-      await this.showHotelsMenu(chatId);
+      const stateName = match && match[1] ? match[1].trim() : null;
+      
+      if (stateName) {
+        // Direct state search: /hotel Lagos
+        await this.searchHotelsInCity(chatId, stateName);
+      } else {
+        // Show state selection menu
+        await this.showHotelStateSelection(chatId);
+      }
     });
 
     // === STUDY GROUP COMMANDS ===
@@ -970,36 +978,24 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.searchRestaurants(chatId, location);
     });
 
-    // Browse restaurants command
+    // Unified /food command - shows state selection menu
+    this.bot.onText(/\/food(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const stateName = match && match[1] ? match[1].trim() : null;
+      
+      if (stateName) {
+        // Direct state search: /food Lagos
+        await this.searchRestaurantsByCity(chatId, stateName);
+      } else {
+        // Show state selection menu
+        await this.showRestaurantStateSelection(chatId);
+      }
+    });
+
+    // Legacy command support (redirects to /food)
     this.bot.onText(/\/restaurants/, async (msg) => {
       const chatId = msg.chat.id;
-      await this.searchRestaurants(chatId, null);
-    });
-
-    // Nigerian city shortcut commands
-    this.bot.onText(/\/food_lagos/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.searchRestaurantsByCity(chatId, 'Lagos');
-    });
-
-    this.bot.onText(/\/food_abuja/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.searchRestaurantsByCity(chatId, 'Abuja');
-    });
-
-    this.bot.onText(/\/food_portharcourt/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.searchRestaurantsByCity(chatId, 'Port Harcourt');
-    });
-
-    this.bot.onText(/\/food_ibadan/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.searchRestaurantsByCity(chatId, 'Ibadan');
-    });
-
-    this.bot.onText(/\/food_kano/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.searchRestaurantsByCity(chatId, 'Kano');
+      await this.showRestaurantStateSelection(chatId);
     });
 
     // Nigerian cuisine command
@@ -1021,10 +1017,15 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.startHotelRegistration(chatId);
     });
 
+    // Legacy command support (redirects to /hotel)
     this.bot.onText(/\/searchhotels(?:\s+(.+))?/, async (msg, match) => {
       const chatId = msg.chat.id;
       const location = match && match[1] ? match[1].trim() : null;
-      await this.searchHotels(chatId, location);
+      if (location) {
+        await this.searchHotelsInCity(chatId, location);
+      } else {
+        await this.showHotelStateSelection(chatId);
+      }
     });
 
     this.bot.onText(/\/bookhotel(?:\s+(.+))?/, async (msg, match) => {
@@ -1879,6 +1880,21 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         break;
 
       // === RESTAURANT CALLBACKS ===
+      
+      // Handle restaurant state selection pagination
+      if (data.startsWith('restaurant_states_page_')) {
+        const page = parseInt(data.replace('restaurant_states_page_', ''));
+        await this.showRestaurantStateSelection(chatId, page);
+        break;
+      }
+      
+      // Handle restaurant state selection
+      if (data.startsWith('restaurant_state_')) {
+        const stateName = data.replace('restaurant_state_', '').replace(/_/g, ' ');
+        await this.searchRestaurantsByCity(chatId, stateName);
+        break;
+      }
+      
       case 'browse_restaurants':
         // Ask user to share location for nearby restaurants
         await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'restaurant_search');
@@ -1974,6 +1990,21 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         break;
 
       // === HOTEL BOOKING CALLBACKS (Google Maps Integration) ===
+      
+      // Handle hotel state selection pagination
+      if (data.startsWith('hotel_states_page_')) {
+        const page = parseInt(data.replace('hotel_states_page_', ''));
+        await this.showHotelStateSelection(chatId, page);
+        break;
+      }
+      
+      // Handle hotel state selection
+      if (data.startsWith('hotel_state_')) {
+        const stateName = data.replace('hotel_state_', '').replace(/_/g, ' ');
+        await this.searchHotelsInCity(chatId, stateName);
+        break;
+      }
+      
       case 'hotel_browse_states':
         await this.showHotelStateSelection(chatId);
         break;
@@ -10079,6 +10110,56 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error showing hotel categories:', error);
       await this.bot.sendMessage(chatId, '❌ Error loading categories. Please try again.');
+    }
+  }
+
+  /**
+   * Show restaurant state selection menu
+   */
+  async showRestaurantStateSelection(chatId, page = 0) {
+    try {
+      const NigerianStates = require('./config/NigerianStates');
+      const keyboard = NigerianStates.getStateSelectionKeyboard('restaurant', page);
+      
+      const message = `🍽️ *FIND RESTAURANTS BY STATE*\n\n` +
+        `Select a Nigerian state to discover restaurants:\n\n` +
+        `📍 All 36 states + FCT Abuja\n` +
+        `⭐ Ratings, reviews & delivery info\n` +
+        `🚚 Real-time delivery tracking\n\n` +
+        `💡 Tip: You can also use /food StateName`;
+      
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('❌ Error showing restaurant states:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading states. Please try /food again.');
+    }
+  }
+
+  /**
+   * Show hotel state selection menu
+   */
+  async showHotelStateSelection(chatId, page = 0) {
+    try {
+      const NigerianStates = require('./config/NigerianStates');
+      const keyboard = NigerianStates.getStateSelectionKeyboard('hotel', page);
+      
+      const message = `🏨 *FIND HOTELS BY STATE*\n\n` +
+        `Select a Nigerian state to discover hotels:\n\n` +
+        `📍 All 36 states + FCT Abuja\n` +
+        `⭐ Ratings, amenities & pricing\n` +
+        `🛏️ Real-time availability\n\n` +
+        `💡 Tip: You can also use /hotel StateName`;
+      
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } catch (error) {
+      console.error('❌ Error showing hotel states:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading states. Please try /hotel again.');
     }
   }
 
