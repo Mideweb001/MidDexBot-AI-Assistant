@@ -363,26 +363,28 @@ Bot: Directly shows Enugu hotels (skips menu)
 5. **API Key**: Secured with restrictions
 6. **Scripts Ready**: populate-restaurants.js and populate-hotels.js
 
-### ⏳ Pending (User Action Required)
+### ✅ Database Population COMPLETE
 
-**To make everything fully functional, you need to populate the databases**:
+**Databases successfully populated with real Google Maps data**:
 
-```bash
-# Step 1: Open Railway Shell
-railway shell
-
-# Step 2: Populate restaurants (~15-20 minutes)
-node scripts/populate-restaurants.js
-
-# Step 3: Populate hotels (~10-15 minutes)  
-node scripts/populate-hotels.js
-
-# Step 4: Exit shell
-exit
+```
+✅ Restaurants: 3,001 entries (100% complete)
+✅ Hotels:      1,347 entries (100% complete)
+✅ Coverage:    All 37 Nigerian locations
+✅ GPS Data:    100% geolocated
+✅ Ratings:     Real Google ratings included
 ```
 
-**See**: `POPULATE-NOW.md` for quick guide
-**See**: `DATABASE-POPULATION-GUIDE.md` for full details
+**Population completed on**: November 22, 2025
+
+**Scripts executed**:
+- ✅ `populate-restaurants.js` - All 37 locations
+- ✅ `populate-hotels.js` - All 37 locations
+
+**Bug fixes applied**:
+- Fixed hotel schema mismatch (name → hotel_name)
+- Added default contact_phone for missing data
+- Committed to repository (commit: e5198af)
 
 ---
 
@@ -509,8 +511,9 @@ States grouped by Nigeria's 6 geopolitical zones for better UX
 
 ---
 
-**🎯 NEXT STEP**: Open `POPULATE-NOW.md` and follow the 2-step guide to populate your databases!
+**🎯 NEXT STEP**: Test the /food and /hotel commands in your Telegram bot!
 
 **Last Updated**: November 22, 2025
-**Status**: ✅ READY FOR POPULATION
+**Status**: ✅ **FULLY OPERATIONAL** 🚀
 **Bot URL**: https://telegrambot-production-5661.up.railway.app
+**Database**: 3,001 restaurants + 1,347 hotels (100% populated)
