@@ -275,16 +275,16 @@ class InterfaceManager {
     } else if (section === 'restaurants') {
       keyboard.inline_keyboard = [
         [
-          { text: '🔍 Search Restaurants', callback_data: 'search_restaurants' },
-          { text: '🍕 Browse All', callback_data: 'browse_restaurants' }
+          { text: '� Browse by State', callback_data: 'restaurant_states_page_0' },
+          { text: '🔍 Search', callback_data: 'search_restaurants' }
         ],
         [
-          { text: '📍 Near Me', callback_data: 'restaurants_near_me' },
-          { text: '🇳🇬 Nigerian Food', callback_data: 'nigerian_cuisines' }
+          { text: '�️ Near Me', callback_data: 'restaurants_near_me' },
+          { text: '� By Cuisine', callback_data: 'browse_cuisines' }
         ],
         [
-          { text: '🛒 Order Now', callback_data: 'start_food_order' },
-          { text: '📦 My Orders', callback_data: 'my_food_orders' }
+          { text: '🛒 My Orders', callback_data: 'my_food_orders' },
+          { text: '⭐ Top Rated', callback_data: 'top_rated_restaurants' }
         ],
         [
           { text: '🏪 Register Restaurant', callback_data: 'register_restaurant' },

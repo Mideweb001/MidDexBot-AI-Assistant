@@ -1896,16 +1896,19 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       }
       
       case 'browse_restaurants':
-        // Ask user to share location for nearby restaurants
-        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'restaurant_search');
+        // Show state selection menu for browsing restaurants
+        await this.showRestaurantStateSelection(chatId);
+        break;
+      
+      case 'browse_cuisines':
+        await this.showCuisineSelection(chatId);
+        break;
+      
+      case 'top_rated_restaurants':
         await this.bot.sendMessage(chatId, 
-          '🍽️ *Browse Restaurants*\n\n' +
-          '📍 To find restaurants near you, please share your location.\n\n' +
-          'This will help us show you:\n' +
-          '• Restaurants closest to you\n' +
-          '• Accurate delivery times\n' +
-          '• Available delivery options\n\n' +
-          '💡 *Or type a city name* (e.g., "Lagos", "Abuja")', 
+          '⭐ *Top Rated Restaurants*\n\n' +
+          'Coming soon! This will show the highest rated restaurants across Nigeria.\n\n' +
+          'For now, browse by state to find top restaurants in your area.', 
           {
             parse_mode: 'Markdown',
             reply_markup: {
