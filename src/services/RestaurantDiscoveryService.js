@@ -66,27 +66,16 @@ class RestaurantDiscoveryService {
       // Filter by state (check tags JSON array for state name)
       // Tags format: [city, state, cuisine]
       if (state) {
-        // Use JSON search - works for both SQLite and PostgreSQL
+        // Simple approach: cast tags JSON to text and search within it
+        // Works for both SQLite and PostgreSQL
         const sequelize = Restaurant.sequelize;
-        const dialect = sequelize.getDialect();
-        
-        if (dialect === 'postgres') {
-          // PostgreSQL JSON contains operator
-          whereClause[Op.or] = [
-            sequelize.where(
-              sequelize.cast(sequelize.col('tags'), 'text'),
-              { [Op.like]: `%${state}%` }
-            )
-          ];
-        } else {
-          // SQLite - search in JSON as text
-          whereClause[Op.or] = [
-            sequelize.where(
-              sequelize.fn('json_extract', sequelize.col('tags'), '$'),
-              { [Op.like]: `%${state}%` }
-            )
-          ];
-        }
+        whereClause[Op.or] = [
+          sequelize.where(
+            sequelize.cast(sequelize.col('tags'), 'TEXT'),
+            { [Op.like]: `%${state}%` }
+          ),
+          { address: { [Op.like]: `%${state}%` } }
+        ];
       }
 
       // Filter by cuisine
