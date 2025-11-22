@@ -1301,6 +1301,14 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     const user = await this.databaseService.getUserByTelegramId(chatId);
     const userSessionData = user ? await this.databaseService.getConversationData(user.id) : null;
     
+    // Check if user is awaiting business keyword search
+    const expectingBusinessKeyword = await this.conversationManager.getUserData(chatId, 'expecting_business_keyword');
+    if (expectingBusinessKeyword) {
+      await this.conversationManager.setUserData(chatId, 'expecting_business_keyword', false);
+      await this.searchBusinessesByKeyword(chatId, msg.text);
+      return;
+    }
+    
     // Check if user is awaiting homework question input
     const awaitingHomework = await this.conversationManager.getUserData(chatId, 'awaiting_homework_question');
     if (awaitingHomework) {
@@ -1664,7 +1672,31 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
 
       // === MARKETPLACE CALLBACKS ===
       case 'search_businesses':
-        await this.bot.sendMessage(chatId, '🔎 *Search Businesses*\n\nWhat type of business are you looking for?\n\nExample: "restaurant", "electronics shop", or send a location', { parse_mode: 'Markdown' });
+        await this.showBusinessSearchOptions(chatId);
+        break;
+      
+      case 'search_by_location':
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'business_search');
+        await this.bot.sendMessage(chatId, '� *Search by Location*\n\nPlease share your location to find nearby businesses:', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+      
+      case 'search_by_category':
+        await this.showBusinessCategories(chatId);
+        break;
+      
+      case 'search_by_keyword':
+        await this.bot.sendMessage(chatId, '🔤 *Search by Keyword*\n\nType what you\'re looking for:\n\nExamples:\n• "electronics"\n• "restaurant"\n• "fashion"\n• "pharmacy"', { 
+          parse_mode: 'Markdown'
+        });
+        // Set conversation state to expect keyword
+        await this.conversationManager.setUserData(chatId, 'expecting_business_keyword', true);
         break;
 
       case 'my_business':
@@ -1846,8 +1878,13 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         break;
 
       default:
+        // Handle marketplace category search
+        if (data.startsWith('category_')) {
+          const category = data.replace('category_', '');
+          await this.searchBusinessesByCategory(chatId, category);
+        }
         // Handle dynamic crypto callbacks
-        if (data.startsWith('crypto_details_')) {
+        else if (data.startsWith('crypto_details_')) {
           const coinId = data.replace('crypto_details_', '');
           await this.showCoinDetails(chatId, coinId);
         } else if (data.startsWith('crypto_news_')) {
@@ -5563,6 +5600,191 @@ Send documents, ask questions, or use commands to get started!
     });
   }
 
+  async showBusinessSearchOptions(chatId) {
+    const message = `🔎 *Search Businesses*\n\nChoose a search method:\n\n📍 Share your location to find nearby businesses\n🏷️ Browse by category\n🔤 Search by keyword`;
+    
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📍 Share Location', callback_data: 'search_by_location' }],
+          [{ text: '🏷️ Browse Categories', callback_data: 'search_by_category' }],
+          [{ text: '🔤 Search by Keyword', callback_data: 'search_by_keyword' }],
+          [{ text: '🏠 Main Menu', callback_data: 'main_menu' }]
+        ]
+      }
+    });
+  }
+
+  async showBusinessCategories(chatId) {
+    const categories = [
+      { name: '🍽️ Restaurants', value: 'restaurant' },
+      { name: '🛒 Supermarket', value: 'supermarket' },
+      { name: '👗 Fashion & Clothing', value: 'fashion' },
+      { name: '📱 Electronics', value: 'electronics' },
+      { name: '💊 Pharmacy', value: 'pharmacy' },
+      { name: '🏥 Healthcare', value: 'healthcare' },
+      { name: '🏋️ Fitness & Gym', value: 'fitness' },
+      { name: '💇 Beauty & Salon', value: 'beauty' },
+      { name: '🏠 Home & Garden', value: 'home' },
+      { name: '🎓 Education', value: 'education' }
+    ];
+
+    const keyboard = [];
+    for (let i = 0; i < categories.length; i += 2) {
+      const row = [
+        { text: categories[i].name, callback_data: `category_${categories[i].value}` }
+      ];
+      if (i + 1 < categories.length) {
+        row.push({ text: categories[i + 1].name, callback_data: `category_${categories[i + 1].value}` });
+      }
+      keyboard.push(row);
+    }
+    keyboard.push([{ text: '🔙 Back', callback_data: 'search_businesses' }]);
+
+    await this.bot.sendMessage(chatId, '🏷️ *Browse by Category*\n\nSelect a business category:', {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  }
+
+  async searchBusinessesByCategory(chatId, category) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Searching ${category} businesses...`);
+      
+      const result = await this.businessService.searchBusinesses(null, null, null, category, 50);
+      
+      if (result.success && result.businesses.length > 0) {
+        let message = `📊 *Found ${result.count} ${category} businesses*\n\n`;
+        
+        result.businesses.slice(0, 10).forEach((business, index) => {
+          message += `${index + 1}. 🏢 *${business.business_name}*\n`;
+          message += `   📍 ${business.address || 'Address not provided'}\n`;
+          message += `   ⭐ Rating: ${business.rating || 'Not rated'}/5.0\n`;
+          message += `   📞 ${business.phone || 'No phone'}\n`;
+          message += `   /view_business_${business.id}\n\n`;
+        });
+
+        if (result.count > 10) {
+          message += `\n💡 Showing top 10 of ${result.count} results`;
+        }
+
+        await this.bot.sendMessage(chatId, message, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔙 Back to Categories', callback_data: 'search_by_category' },
+              { text: '🏠 Home', callback_data: 'main_menu' }
+            ]]
+          }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, `❌ No ${category} businesses found yet.\n\n💡 Be the first to register your business!\nUse /registerbusiness`, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '➕ Register Business', callback_data: 'register_business' },
+              { text: '🔙 Back', callback_data: 'search_by_category' }
+            ]]
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error searching businesses by category:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching businesses. Please try again.');
+    }
+  }
+
+  async searchBusinessesByLocation(chatId, latitude, longitude) {
+    try {
+      await this.bot.sendMessage(chatId, '🔍 Searching nearby businesses...');
+      
+      const result = await this.businessService.searchBusinesses(null, latitude, longitude, null, 10);
+      
+      if (result.success && result.businesses.length > 0) {
+        let message = `📍 *Found ${result.count} businesses nearby*\n\n`;
+        
+        result.businesses.forEach((business, index) => {
+          message += `${index + 1}. 🏢 *${business.business_name}*\n`;
+          message += `   📍 ${business.distance ? business.distance.toFixed(2) + ' km away' : 'Distance unknown'}\n`;
+          message += `   🏷️ ${business.category}\n`;
+          message += `   ⭐ ${business.rating || 'Not rated'}/5.0\n`;
+          message += `   /view_business_${business.id}\n\n`;
+        });
+
+        await this.bot.sendMessage(chatId, message, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 Search Again', callback_data: 'search_businesses' },
+              { text: '🏠 Home', callback_data: 'main_menu' }
+            ]]
+          }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, '❌ No businesses found in your area yet.\n\n💡 Register your business to be the first!\nUse /registerbusiness', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '➕ Register Business', callback_data: 'register_business' },
+              { text: '🔙 Back', callback_data: 'search_businesses' }
+            ]]
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error searching businesses by location:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching businesses. Please try again.');
+    }
+  }
+
+  async searchBusinessesByKeyword(chatId, keyword) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Searching for "${keyword}"...`);
+      
+      const result = await this.businessService.searchBusinesses(keyword);
+      
+      if (result.success && result.businesses.length > 0) {
+        let message = `🔎 *Found ${result.count} results for "${keyword}"*\n\n`;
+        
+        result.businesses.slice(0, 10).forEach((business, index) => {
+          message += `${index + 1}. 🏢 *${business.business_name}*\n`;
+          message += `   🏷️ ${business.category}\n`;
+          message += `   📍 ${business.address || 'Address not provided'}\n`;
+          message += `   ⭐ ${business.rating || 'Not rated'}/5.0\n`;
+          message += `   /view_business_${business.id}\n\n`;
+        });
+
+        if (result.count > 10) {
+          message += `\n💡 Showing top 10 of ${result.count} results`;
+        }
+
+        await this.bot.sendMessage(chatId, message, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 New Search', callback_data: 'search_by_keyword' },
+              { text: '🏠 Home', callback_data: 'main_menu' }
+            ]]
+          }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, `❌ No results found for "${keyword}".\n\nTry:\n• Different keywords\n• Broader terms\n• Category search`, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🏷️ Browse Categories', callback_data: 'search_by_category' },
+              { text: '🔙 Back', callback_data: 'search_businesses' }
+            ]]
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error searching businesses by keyword:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching businesses. Please try again.');
+    }
+  }
+
   async showHotelsMenu(chatId) {
     const message = InterfaceManager.getHotelsMenu();
     await this.bot.sendMessage(chatId, message, {
@@ -7214,7 +7436,10 @@ Send documents, ask questions, or use commands to get started!
       const userData = await this.conversationManager.getUserData(chatId);
       const awaitingLocation = userData?.awaitingLocation;
       
-      if (awaitingLocation === 'hotel_search') {
+      if (awaitingLocation === 'business_search') {
+        await this.bot.sendMessage(chatId, '📍 Location received! 🔍 Finding nearby businesses...');
+        await this.searchBusinessesByLocation(chatId, latitude, longitude);
+      } else if (awaitingLocation === 'hotel_search') {
         await this.bot.sendMessage(chatId, '📍 Location received! 🏨 Finding nearby hotels...');
         await this.searchHotelsByLocation(chatId, latitude, longitude);
       } else if (awaitingLocation === 'restaurant_search') {
