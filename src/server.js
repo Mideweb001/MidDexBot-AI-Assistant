@@ -1872,7 +1872,25 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
 
       // === RESTAURANT CALLBACKS ===
       case 'browse_restaurants':
-        await this.searchRestaurants(chatId, null);
+        // Ask user to share location for nearby restaurants
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'restaurant_search');
+        await this.bot.sendMessage(chatId, 
+          '🍽️ *Browse Restaurants*\n\n' +
+          '📍 To find restaurants near you, please share your location.\n\n' +
+          'This will help us show you:\n' +
+          '• Restaurants closest to you\n' +
+          '• Accurate delivery times\n' +
+          '• Available delivery options\n\n' +
+          '💡 *Or type a city name* (e.g., "Lagos", "Abuja")', 
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true
+            }
+          }
+        );
         break;
 
       case 'search_restaurants':
@@ -8942,7 +8960,7 @@ Send documents, ask questions, or use commands to get started!
 
   async searchRestaurantsByLocation(chatId, latitude, longitude) {
     try {
-      await this.bot.sendMessage(chatId, '🔍 Finding restaurants near you...');
+      const loadingMsg = await this.bot.sendMessage(chatId, '🔍 Finding restaurants near you...');
       
       // Store location for checkout
       await this.conversationManager.setUserData(chatId, 'last_location', {
@@ -8960,7 +8978,7 @@ Send documents, ask questions, or use commands to get started!
       }
       
       // Get nearby restaurants using new discovery service
-      const restaurants = await this.restaurantDiscovery.findNearbyRestaurants(
+      const result = await this.restaurantDiscovery.findNearbyRestaurants(
         latitude,
         longitude,
         {
@@ -8971,37 +8989,65 @@ Send documents, ask questions, or use commands to get started!
         }
       );
       
-      if (!restaurants || restaurants.length === 0) {
+      await this.bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+      
+      if (!result.success || !result.restaurants || result.restaurants.length === 0) {
         await this.bot.sendMessage(chatId, 
-          '😕 No restaurants found within 20km.\n\n' +
-          'Try:\n' +
-          '• Browse by state\n' +
-          '• Browse by cuisine\n' +
-          '• Search by name',
+          '😕 *No Restaurants Found Nearby*\n\n' +
+          'We couldn\'t find any restaurants within 20km of your location.\n\n' +
+          'This might be because:\n' +
+          '• We\'re still building our restaurant database\n' +
+          '• No restaurants in your area yet\n\n' +
+          '*Try these alternatives:*',
           { 
             parse_mode: 'Markdown',
             reply_markup: {
-              inline_keyboard: [[
-                { text: '🗺️ Browse by State', callback_data: 'browse_by_state' },
-                { text: '🍴 Browse by Cuisine', callback_data: 'browse_by_cuisine' }
-              ]]
+              inline_keyboard: [
+                [
+                  { text: '🗺️ Browse by State', callback_data: 'browse_by_state' },
+                  { text: '🍴 Browse by Cuisine', callback_data: 'browse_by_cuisine' }
+                ],
+                [
+                  { text: '📱 Register Your Restaurant', callback_data: 'register_restaurant' }
+                ],
+                [
+                  { text: '🏠 Main Menu', callback_data: 'menu_main' }
+                ]
+              ]
             }
           }
         );
         return;
       }
 
-      // Display restaurants using InterfaceManager
-      const message = InterfaceManager.formatRestaurantList(restaurants, { latitude, longitude });
+      const restaurants = result.restaurants;
+      
+      // Build message with restaurant list
+      let message = `🍽️ *Restaurants Near You*\n\n`;
+      message += `📍 Found ${restaurants.length} restaurant${restaurants.length > 1 ? 's' : ''}\n\n`;
+      
+      restaurants.slice(0, 10).forEach((restaurant, index) => {
+        const ratingStars = '⭐'.repeat(Math.round(restaurant.rating || 0));
+        message += `${index + 1}. *${restaurant.name}*\n`;
+        message += `   ${ratingStars} ${(restaurant.rating || 0).toFixed(1)} • ${restaurant.cuisine_type}\n`;
+        message += `   📍 ${restaurant.distance ? restaurant.distance.toFixed(1) : '?'}km away\n`;
+        message += `   💰 ₦${restaurant.delivery_fee} delivery • Min: ₦${restaurant.minimum_order}\n\n`;
+      });
+      
+      message += `\n💡 Tap a restaurant to see menu and order`;
       
       const keyboard = [];
       restaurants.slice(0, 10).forEach(restaurant => {
         keyboard.push([{
-          text: `🏪 ${restaurant.name} (${restaurant.distance.toFixed(1)}km)`,
+          text: `�️ ${restaurant.name} (${restaurant.distance ? restaurant.distance.toFixed(1) : '?'}km)`,
           callback_data: `restaurant_details_${restaurant.id}`
         }]);
       });
-      keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
+      
+      keyboard.push([
+        { text: '🔄 Refresh', callback_data: 'browse_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'menu_main' }
+      ]);
 
       await this.bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
@@ -9011,7 +9057,15 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error searching restaurants by location:', error);
       await this.bot.sendMessage(chatId, 
-        '❌ Error finding nearby restaurants. Please try again.'
+        '❌ Error finding nearby restaurants. Please try again.',
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🔄 Try Again', callback_data: 'browse_restaurants' },
+              { text: '🏠 Main Menu', callback_data: 'menu_main' }
+            ]]
+          }
+        }
       );
     }
   }
