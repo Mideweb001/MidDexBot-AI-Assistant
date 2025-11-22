@@ -356,20 +356,20 @@ class InterfaceManager {
     } else if (section === 'hotels') {
       keyboard.inline_keyboard = [
         [
-          { text: '🔍 Search Hotels', callback_data: 'search_hotels' },
-          { text: '🌍 By Location', callback_data: 'hotels_by_location' }
+          { text: '� Browse by State', callback_data: 'hotel_states_page_0' },
+          { text: '🔍 Search Hotels', callback_data: 'search_hotels' }
         ],
         [
-          { text: '📍 Near Me', callback_data: 'hotels_near_me' },
+          { text: '�️ Near Me', callback_data: 'hotels_near_me' },
           { text: '⭐ Top Rated', callback_data: 'hotels_top_rated' }
         ],
         [
           { text: '📅 My Bookings', callback_data: 'my_hotel_bookings' },
-          { text: '⭐ Write Review', callback_data: 'write_hotel_review' }
+          { text: '✍️ Write Review', callback_data: 'write_hotel_review' }
         ],
         [
           { text: '🏢 Register Hotel', callback_data: 'register_hotel' },
-          { text: '💼 Manage', callback_data: 'manage_hotels' }
+          { text: '⚙️ Manage Hotel', callback_data: 'manage_hotels' }
         ],
         [buttons.home]
       ];

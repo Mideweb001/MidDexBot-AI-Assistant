@@ -1011,39 +1011,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.startHotelReview(chatId, bookingId);
     });
 
-    // Alternative command formats
-    this.bot.onText(/\/registerhotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.startHotelRegistration(chatId);
-    });
-
-    // Legacy command support (redirects to /hotel)
-    this.bot.onText(/\/searchhotels(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const location = match && match[1] ? match[1].trim() : null;
-      if (location) {
-        await this.searchHotelsInCity(chatId, location);
-      } else {
-        await this.showHotelStateSelection(chatId);
-      }
-    });
-
-    this.bot.onText(/\/bookhotel(?:\s+(.+))?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const hotelId = match && match[1] ? match[1].trim() : null;
-      await this.startHotelBooking(chatId, hotelId);
-    });
-
-    this.bot.onText(/\/mybookings/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showMyHotelBookings(chatId);
-    });
-
-    this.bot.onText(/\/managehotel/, async (msg) => {
-      const chatId = msg.chat.id;
-      await this.showHotelManagement(chatId);
-    });
-
     // Business Marketplace commands
     this.bot.onText(/\/register_business/, async (msg) => {
       const chatId = msg.chat.id;
@@ -2061,6 +2028,30 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
 
       case 'manage_hotels':
         await this.showHotelManagement(chatId);
+        break;
+
+      case 'hotels_near_me':
+        await this.bot.sendMessage(chatId, 
+          '📍 *Hotels Near You*\n\n' +
+          'Please share your location to find hotels nearby.', 
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              keyboard: [[{ text: '📍 Share Location', request_location: true }]],
+              one_time_keyboard: true,
+              resize_keyboard: true
+            }
+          }
+        );
+        break;
+
+      case 'hotels_top_rated':
+        await this.bot.sendMessage(chatId, 
+          '⭐ *Top Rated Hotels*\n\n' +
+          'Coming soon! This will show the highest rated hotels across Nigeria.\n\n' +
+          'For now, browse by state to find top hotels in your area.', 
+          { parse_mode: 'Markdown' }
+        );
         break;
 
       // === STUDY HUB CALLBACKS ===
