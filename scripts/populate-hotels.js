@@ -255,7 +255,7 @@ class HotelPopulator {
       // Check if hotel already exists
       const existing = await Hotel.findOne({
         where: {
-          name: place.name,
+          hotel_name: place.name,
           latitude: {
             [sequelize.Sequelize.Op.between]: [
               place.geometry.location.lat - 0.001,
@@ -282,7 +282,7 @@ class HotelPopulator {
 
       const hotelData = {
         owner_id: this.systemUser.id,
-        name: place.name,
+        hotel_name: place.name,
         description: `${category} hotel in ${city.name}, ${city.state}. Google Maps rating: ${place.rating || 'N/A'}`,
         address: place.vicinity || details?.formatted_address || `${city.name}, ${city.state}`,
         city: city.name,
@@ -290,7 +290,7 @@ class HotelPopulator {
         country: 'Nigeria',
         latitude: place.geometry.location.lat,
         longitude: place.geometry.location.lng,
-        phone: details?.formatted_phone_number || null,
+        contact_phone: details?.formatted_phone_number || '+234-XXX-XXXX-XXX',
         email: null,
         website: details?.website || null,
         category: category,
