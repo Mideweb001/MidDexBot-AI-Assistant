@@ -277,7 +277,6 @@ class HotelPopulator {
       }
 
       const category = this.determineHotelCategory(place);
-      const priceRange = this.determinePriceRange(place);
       const amenities = this.generateAmenities(category, place);
 
       const hotelData = {
@@ -291,29 +290,30 @@ class HotelPopulator {
         latitude: place.geometry.location.lat,
         longitude: place.geometry.location.lng,
         contact_phone: details?.formatted_phone_number || '+234-XXX-XXXX-XXX',
-        email: null,
-        website: details?.website || null,
-        category: category,
+        contact_email: null,
+        whatsapp_number: null,
         star_rating: Math.min(5, Math.ceil((place.rating || 3) / 0.9)), // Convert 0-5 rating to star rating
-        price_per_night: Math.floor((priceRange.min + priceRange.max) / 2),
-        total_rooms: Math.floor(Math.random() * 50) + 20, // 20-70 rooms (estimated)
         amenities: amenities,
         check_in_time: '14:00',
         check_out_time: '12:00',
         cancellation_policy: 'Free cancellation up to 24 hours before check-in',
+        payment_methods: ['cash', 'bank_transfer', 'card'],
         rating: place.rating || 0,
         total_reviews: place.user_ratings_total || 0,
         is_active: true,
         is_verified: place.rating >= 4.0,
-        images: [],
-        google_place_id: place.place_id || null,
-        google_maps_url: place.place_id ? `https://www.google.com/maps/place/?q=place_id:${place.place_id}` : null
+        status: 'approved',
+        metadata: {
+          google_place_id: place.place_id || null,
+          google_maps_url: place.place_id ? `https://www.google.com/maps/place/?q=place_id:${place.place_id}` : null,
+          category: category
+        }
       };
 
       await Hotel.create(hotelData);
       this.totalAdded++;
       
-      console.log(`  ✅ ${place.name} - ${category} - ⭐${place.rating || 'N/A'} - ₦${hotelData.price_per_night}/night`);
+      console.log(`  ✅ ${place.name} - ${category} - ⭐${place.rating || 'N/A'} (${place.user_ratings_total || 0} reviews)`);
       return true;
 
     } catch (error) {
@@ -382,17 +382,7 @@ class HotelPopulator {
     console.log('='.repeat(60));
 
     const totalHotels = await Hotel.count();
-    const byCategory = await Hotel.findAll({
-      attributes: [
-        'category',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('AVG', sequelize.col('price_per_night')), 'avg_price']
-      ],
-      group: ['category'],
-      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
-      raw: true
-    });
-
+    
     const byState = await Hotel.findAll({
       attributes: [
         'state',
@@ -404,16 +394,26 @@ class HotelPopulator {
       raw: true
     });
 
+    const byStarRating = await Hotel.findAll({
+      attributes: [
+        'star_rating',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['star_rating'],
+      order: [['star_rating', 'DESC']],
+      raw: true
+    });
+
     console.log('\n📈 Statistics:');
     console.log(`   Total Hotels in Database: ${totalHotels}`);
     console.log(`   ✅ Added this session: ${this.totalAdded}`);
     console.log(`   ⏭️  Skipped (duplicates): ${this.totalSkipped}`);
     console.log(`   ❌ Errors: ${this.errors}`);
 
-    console.log('\n🏨 By Category:');
-    byCategory.forEach(item => {
-      const avgPrice = item.avg_price ? `₦${Math.floor(item.avg_price).toLocaleString()}` : 'N/A';
-      console.log(`   ${item.category}: ${item.count} hotels (avg: ${avgPrice}/night)`);
+    console.log('\n⭐ By Star Rating:');
+    byStarRating.forEach(item => {
+      const stars = '⭐'.repeat(item.star_rating);
+      console.log(`   ${stars} (${item.star_rating}-star): ${item.count} hotels`);
     });
 
     console.log('\n📍 Top 10 States by Hotel Count:');
