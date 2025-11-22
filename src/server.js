@@ -67,6 +67,9 @@ const CourseService = require('./services/CourseService');
 const FoodOrderService = require('./services/FoodOrderService');
 const BusinessService = require('./services/BusinessService');
 const HotelService = require('./services/HotelService');
+const RestaurantDiscoveryService = require('./services/RestaurantDiscoveryService');
+const ShoppingCartService = require('./services/ShoppingCartService');
+const DeliveryTrackingService = require('./services/DeliveryTrackingService');
 const InterfaceManager = require('./config/InterfaceManager');
 
 class TelegramDocumentBot {
@@ -121,6 +124,11 @@ class TelegramDocumentBot {
     
     // Initialize hotel service
     this.hotelService = new HotelService(this.databaseService);
+    
+    // Initialize restaurant discovery and ordering services
+    this.restaurantDiscovery = RestaurantDiscoveryService;
+    this.shoppingCart = ShoppingCartService;
+    this.deliveryTracking = DeliveryTrackingService;
     
     // Database storage handles document persistence
     
@@ -808,6 +816,90 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
       await this.showFoodMenu(chatId);
     });
 
+    // ===== NEW RESTAURANT DISCOVERY & ORDERING COMMANDS =====
+    
+    // Browse restaurants by state
+    this.bot.onText(/\/browse(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const state = match && match[1] ? match[1].trim() : null;
+      
+      if (state) {
+        await this.browseRestaurantsByState(chatId, state);
+      } else {
+        await this.showStateSelection(chatId);
+      }
+    });
+
+    // Find nearby restaurants
+    this.bot.onText(/\/nearby/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.bot.sendMessage(
+        chatId,
+        '📍 *Find Restaurants Near You*\n\n' +
+        'Please share your location to discover restaurants nearby!\n\n' +
+        '💡 _Tap the 📎 attachment button → Location_',
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        }
+      );
+    });
+
+    // Search restaurants
+    this.bot.onText(/\/search(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const query = match && match[1] ? match[1].trim() : null;
+      
+      if (query) {
+        await this.searchRestaurants(chatId, query);
+      } else {
+        await this.bot.sendMessage(
+          chatId,
+          '🔍 *Search Restaurants*\n\n' +
+          'Usage: `/search [query]`\n\n' +
+          'Examples:\n' +
+          '• `/search jollof rice`\n' +
+          '• `/search pizza`\n' +
+          '• `/search chinese food`',
+          { parse_mode: 'Markdown' }
+        );
+      }
+    });
+
+    // View shopping cart
+    this.bot.onText(/\/cart/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showCart(chatId);
+    });
+
+    // Track order
+    this.bot.onText(/\/track(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const orderId = match && match[1] ? match[1].trim() : null;
+      
+      if (orderId) {
+        await this.trackOrder(chatId, orderId);
+      } else {
+        await this.showActiveOrders(chatId);
+      }
+    });
+
+    // Browse by cuisine
+    this.bot.onText(/\/cuisine(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const cuisine = match && match[1] ? match[1].trim() : null;
+      
+      if (cuisine) {
+        await this.browseRestaurantsByCuisine(chatId, cuisine);
+      } else {
+        await this.showCuisineSelection(chatId);
+      }
+    });
+
     // Quick access commands
     this.bot.onText(/\/hub/, async (msg) => {
       const chatId = msg.chat.id;
@@ -880,6 +972,38 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
     this.bot.onText(/\/restaurants/, async (msg) => {
       const chatId = msg.chat.id;
       await this.searchRestaurants(chatId, null);
+    });
+
+    // Nigerian city shortcut commands
+    this.bot.onText(/\/food_lagos/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurantsByCity(chatId, 'Lagos');
+    });
+
+    this.bot.onText(/\/food_abuja/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurantsByCity(chatId, 'Abuja');
+    });
+
+    this.bot.onText(/\/food_portharcourt/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurantsByCity(chatId, 'Port Harcourt');
+    });
+
+    this.bot.onText(/\/food_ibadan/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurantsByCity(chatId, 'Ibadan');
+    });
+
+    this.bot.onText(/\/food_kano/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.searchRestaurantsByCity(chatId, 'Kano');
+    });
+
+    // Nigerian cuisine command
+    this.bot.onText(/\/nigerian_food/, async (msg) => {
+      const chatId = msg.chat.id;
+      await this.showNigerianCuisineCategories(chatId);
     });
 
     // Review hotel command
@@ -1642,8 +1766,17 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.showMarketplaceMenu(chatId);
         break;
 
+      case 'menu_restaurants':
+        await this.showRestaurantsMenu(chatId);
+        break;
+
       case 'menu_food':
-        await this.showFoodDeliveryMenu(chatId);
+        // Legacy support - redirect to restaurants
+        await this.showRestaurantsMenu(chatId);
+        break;
+
+      case 'menu_hotels':
+        await this.showHotelsMenu(chatId);
         break;
 
       case 'menu_study':
@@ -1660,10 +1793,6 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
 
       case 'menu_quick':
         await this.showQuickActionsMenu(chatId);
-        break;
-
-      case 'menu_hotels':
-        await this.showHotelsMenu(chatId);
         break;
 
       case 'show_help':
@@ -1711,21 +1840,152 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         await this.bot.sendMessage(chatId, '➕ *Register Business*\n\nLet\'s get your business listed!\n\nUse /registerbusiness to start the registration process', { parse_mode: 'Markdown' });
         break;
 
-      // === FOOD DELIVERY CALLBACKS ===
+      case 'business_categories':
+        await this.showBusinessCategories(chatId);
+        break;
+
+      case 'businesses_near_me':
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'business_search');
+        await this.bot.sendMessage(chatId, '📍 *Find Businesses Near You*\n\nPlease share your location:', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+
+      case 'my_marketplace_orders':
+        await this.bot.sendMessage(chatId, '🛒 *My Marketplace Orders*\n\nViewing your orders...\n\nUse /myorders for full history', { parse_mode: 'Markdown' });
+        break;
+
+      // === RESTAURANT CALLBACKS ===
       case 'browse_restaurants':
-        await this.bot.sendMessage(chatId, '🍕 *Browse Restaurants*\n\nUse /restaurants to see all available restaurants near you', { parse_mode: 'Markdown' });
+        await this.searchRestaurants(chatId, null);
+        break;
+
+      case 'search_restaurants':
+        await this.bot.sendMessage(chatId, '� *Search Restaurants*\n\nEnter a city or location:\n\nExamples:\n• Lagos\n• Abuja\n• Port Harcourt\n\nOr share your location for nearby restaurants', { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+
+      case 'restaurants_near_me':
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'restaurant_search');
+        await this.bot.sendMessage(chatId, '� *Find Restaurants Near You*\n\nPlease share your location:', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+
+      case 'nigerian_cuisines':
+        await this.showNigerianCuisineCategories(chatId);
         break;
 
       case 'start_food_order':
-        await this.bot.sendMessage(chatId, '🛒 *Start Food Order*\n\nUse /orderfood to begin placing your order', { parse_mode: 'Markdown' });
+        await this.startFoodOrdering(chatId);
         break;
 
       case 'my_food_orders':
-        await this.bot.sendMessage(chatId, '📦 *My Food Orders*\n\nUse /orders to view your order history', { parse_mode: 'Markdown' });
+        await this.showMyOrders(chatId);
         break;
 
       case 'register_restaurant':
-        await this.bot.sendMessage(chatId, '🏪 *Register Restaurant*\n\nUse /registerrestaurant to list your restaurant', { parse_mode: 'Markdown' });
+        await this.startRestaurantRegistration(chatId);
+        break;
+
+      case 'manage_restaurant':
+        await this.showRestaurantManagement(chatId);
+        break;
+
+      // === NEW RESTAURANT DISCOVERY & CART CALLBACKS ===
+      case 'browse_by_state':
+        await this.showStateSelection(chatId);
+        break;
+
+      case 'browse_by_cuisine':
+        await this.showCuisineSelection(chatId);
+        break;
+
+      case 'view_cart':
+        await this.showCart(chatId);
+        break;
+
+      case 'cart_continue':
+        await this.showRestaurantsMenu(chatId);
+        break;
+
+      case 'cart_checkout':
+        await this.checkoutCart(chatId);
+        break;
+
+      case 'cart_clear':
+        await this.clearCart(chatId);
+        break;
+
+      case 'track_my_orders':
+        await this.showActiveOrders(chatId);
+        break;
+
+      // === HOTEL BOOKING CALLBACKS ===
+      case 'search_hotels':
+        await this.bot.sendMessage(chatId, '🔍 *Search Hotels*\n\nEnter a city or destination:\n\nExamples:\n• Lagos\n• Dubai\n• London\n• New York\n\nOr share your location', { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+
+      case 'hotels_by_location':
+        await this.bot.sendMessage(chatId, '🌍 *Search by Location*\n\nEnter city or country name:', { 
+          parse_mode: 'Markdown'
+        });
+        await this.conversationManager.setUserData(chatId, 'expecting_hotel_location', true);
+        break;
+
+      case 'hotels_near_me':
+        await this.conversationManager.setUserData(chatId, 'awaitingLocation', 'hotel_search');
+        await this.bot.sendMessage(chatId, '📍 *Find Hotels Near You*\n\nPlease share your location:', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share My Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        });
+        break;
+
+      case 'hotels_top_rated':
+        await this.bot.sendMessage(chatId, '⭐ *Top Rated Hotels*\n\nSearching for highest rated properties...\n\nUse /search_hotels [city] to find top hotels', { parse_mode: 'Markdown' });
+        break;
+
+      case 'my_hotel_bookings':
+        await this.showMyHotelBookings(chatId);
+        break;
+
+      case 'write_hotel_review':
+        await this.startHotelReview(chatId, null);
+        break;
+
+      case 'register_hotel':
+        await this.startHotelRegistration(chatId);
+        break;
+
+      case 'manage_hotels':
+        await this.showHotelManagement(chatId);
         break;
 
       // === STUDY HUB CALLBACKS ===
@@ -1883,6 +2143,11 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
           const category = data.replace('category_', '');
           await this.searchBusinessesByCategory(chatId, category);
         }
+        // Handle Nigerian cuisine categories
+        else if (data.startsWith('nigerian_')) {
+          const cuisine = data.replace('nigerian_', '');
+          await this.searchRestaurantsByCuisine(chatId, cuisine);
+        }
         // Handle dynamic crypto callbacks
         else if (data.startsWith('crypto_details_')) {
           const coinId = data.replace('crypto_details_', '');
@@ -1966,6 +2231,41 @@ ${aiStatus !== 'Working' ? '\n⚠️ Note: OpenAI features may be limited due to
         } else if (data.startsWith('view_cart_')) {
           const restaurantId = parseInt(data.replace('view_cart_', ''));
           await this.bot.sendMessage(chatId, '🛒 Cart feature coming soon!');
+        }
+        // === NEW RESTAURANT DISCOVERY DYNAMIC CALLBACKS ===
+        else if (data.startsWith('state_')) {
+          const state = data.replace('state_', '').replace(/_/g, ' ');
+          await this.browseRestaurantsByState(chatId, state);
+        } else if (data.startsWith('cuisine_')) {
+          const cuisine = data.replace('cuisine_', '').replace(/_/g, ' ');
+          await this.browseRestaurantsByCuisine(chatId, cuisine);
+        } else if (data.startsWith('restaurant_details_')) {
+          const restaurantId = parseInt(data.replace('restaurant_details_', ''));
+          await this.showRestaurantFullDetails(chatId, restaurantId);
+        } else if (data.startsWith('add_to_cart_')) {
+          const itemId = parseInt(data.replace('add_to_cart_', ''));
+          await this.addItemToCart(chatId, itemId);
+        } else if (data.startsWith('cart_increase_')) {
+          const itemIndex = parseInt(data.replace('cart_increase_', ''));
+          await this.updateCartQuantity(chatId, itemIndex, 1);
+        } else if (data.startsWith('cart_decrease_')) {
+          const itemIndex = parseInt(data.replace('cart_decrease_', ''));
+          await this.updateCartQuantity(chatId, itemIndex, -1);
+        } else if (data.startsWith('cart_remove_')) {
+          const itemIndex = parseInt(data.replace('cart_remove_', ''));
+          await this.removeFromCart(chatId, itemIndex);
+        } else if (data.startsWith('cart_view_')) {
+          const itemIndex = parseInt(data.replace('cart_view_', ''));
+          await this.showCartItemDetails(chatId, itemIndex);
+        } else if (data.startsWith('track_order_')) {
+          const orderId = parseInt(data.replace('track_order_', ''));
+          await this.trackOrder(chatId, orderId);
+        } else if (data.startsWith('filter_cuisine_')) {
+          const cuisine = data.replace('filter_cuisine_', '').replace(/_/g, ' ');
+          await this.filterRestaurantsByCuisine(chatId, cuisine);
+        } else if (data.startsWith('sort_by_')) {
+          const sortOption = data.replace('sort_by_', '');
+          await this.sortRestaurants(chatId, sortOption);
         }
         // Handle dynamic study group callbacks
         else if (data.startsWith('sg_join_')) {
@@ -3865,6 +4165,14 @@ ${studyPlan.tips.map(tip => `✨ ${tip}`).join('\n')}
         { command: 'orders', description: '📦 My Food Orders' },
         { command: 'registerrestaurant', description: '🏪 Register Restaurant' },
         
+        // Nigerian Food Categories
+        { command: 'nigerian_food', description: '🇳🇬 Nigerian Cuisines' },
+        { command: 'food_lagos', description: '🏙️ Lagos Restaurants' },
+        { command: 'food_abuja', description: '🏛️ Abuja Restaurants' },
+        { command: 'food_portharcourt', description: '🌊 Port Harcourt Restaurants' },
+        { command: 'food_ibadan', description: '🌆 Ibadan Restaurants' },
+        { command: 'food_kano', description: '🕌 Kano Restaurants' },
+        
         // Hotel Booking
         { command: 'hotels', description: '🏨 Hotel Booking Hub' },
         { command: 'search_hotels', description: '🔍 Search Hotels' },
@@ -5560,12 +5868,616 @@ Send documents, ask questions, or use commands to get started!
     });
   }
 
-  async showFoodDeliveryMenu(chatId) {
-    const message = InterfaceManager.getFoodDeliveryMenu();
+  async showRestaurantsMenu(chatId) {
+    const message = InterfaceManager.getRestaurantsMenu();
     await this.bot.sendMessage(chatId, message, {
       parse_mode: 'Markdown',
-      reply_markup: InterfaceManager.getSectionKeyboard('food')
+      reply_markup: InterfaceManager.getSectionKeyboard('restaurants')
     });
+  }
+
+  async showFoodDeliveryMenu(chatId) {
+    // Legacy method - redirects to showRestaurantsMenu
+    return this.showRestaurantsMenu(chatId);
+  }
+
+  // ===== NEW RESTAURANT DISCOVERY & ORDERING METHODS =====
+
+  async showStateSelection(chatId) {
+    try {
+      const { message, states } = InterfaceManager.getStateSelectionMenu();
+      
+      const keyboard = [];
+      states.forEach(row => {
+        keyboard.push(row.map(state => ({
+          text: state,
+          callback_data: `state_${state.replace(/ /g, '_')}`
+        })));
+      });
+      keyboard.push([
+        { text: '📍 Use My Location', callback_data: 'restaurants_near_me' },
+        { text: '🏠 Main Menu', callback_data: 'menu_main' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing state selection:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading states. Please try again.');
+    }
+  }
+
+  async showCuisineSelection(chatId) {
+    try {
+      const { message, cuisines } = InterfaceManager.getCuisineSelectionMenu();
+      
+      const keyboard = [];
+      cuisines.forEach(row => {
+        keyboard.push(row.map(cuisine => ({
+          text: cuisine,
+          callback_data: `cuisine_${cuisine.substring(2).trim().replace(/ /g, '_')}`
+        })));
+      });
+      keyboard.push([
+        { text: '🔙 Back', callback_data: 'menu_restaurants' },
+        { text: '🏠 Main Menu', callback_data: 'menu_main' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (error) {
+      console.error('Error showing cuisine selection:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading cuisines. Please try again.');
+    }
+  }
+
+  async browseRestaurantsByState(chatId, state) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Finding restaurants in ${state}...`);
+      
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      const restaurants = await this.restaurantDiscovery.browseRestaurantsByState(state, {
+        isOpen: false,
+        sortBy: 'rating',
+        limit: 20
+      });
+
+      if (restaurants && restaurants.length > 0) {
+        const message = InterfaceManager.formatRestaurantList(restaurants);
+        
+        // Create keyboard with restaurant buttons
+        const keyboard = [];
+        restaurants.slice(0, 10).forEach(restaurant => {
+          keyboard.push([{
+            text: `🏪 ${restaurant.name}`,
+            callback_data: `restaurant_details_${restaurant.id}`
+          }]);
+        });
+        keyboard.push([
+          { text: '🗺️ Change State', callback_data: 'browse_by_state' },
+          { text: '🏠 Main Menu', callback_data: 'menu_main' }
+        ]);
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, 
+          `😕 No restaurants found in ${state} yet.\n\n` +
+          `💡 Try another state or share your location for nearby restaurants.`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🗺️ Choose Another State', callback_data: 'browse_by_state' },
+                { text: '📍 Use Location', callback_data: 'restaurants_near_me' }
+              ]]
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error browsing restaurants by state:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurants. Please try again.');
+    }
+  }
+
+  async browseRestaurantsByCuisine(chatId, cuisine) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Finding ${cuisine} restaurants...`);
+      
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      const restaurants = await this.restaurantDiscovery.searchRestaurants(cuisine, null, {
+        sortBy: 'rating',
+        limit: 20
+      });
+
+      if (restaurants && restaurants.length > 0) {
+        const message = InterfaceManager.formatRestaurantList(restaurants);
+        
+        const keyboard = [];
+        restaurants.slice(0, 10).forEach(restaurant => {
+          keyboard.push([{
+            text: `🏪 ${restaurant.name}`,
+            callback_data: `restaurant_details_${restaurant.id}`
+          }]);
+        });
+        keyboard.push([
+          { text: '🍴 Change Cuisine', callback_data: 'browse_by_cuisine' },
+          { text: '🏠 Main Menu', callback_data: 'menu_main' }
+        ]);
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, 
+          `😕 No ${cuisine} restaurants found yet.\n\n` +
+          `💡 Try another cuisine type or browse by location.`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🍴 Choose Another Cuisine', callback_data: 'browse_by_cuisine' },
+                { text: '🗺️ Browse by State', callback_data: 'browse_by_state' }
+              ]]
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error browsing restaurants by cuisine:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurants. Please try again.');
+    }
+  }
+
+  async showRestaurantFullDetails(chatId, restaurantId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      // Get user location if available
+      const userData = await this.conversationManager.getUserData(chatId, 'last_location');
+      const userLat = userData?.latitude;
+      const userLng = userData?.longitude;
+      
+      const details = await this.restaurantDiscovery.getRestaurantFullDetails(
+        restaurantId,
+        userLat,
+        userLng
+      );
+
+      if (details && details.restaurant) {
+        const message = InterfaceManager.formatRestaurantDetails(
+          details.restaurant,
+          details.menu,
+          userLat && userLng ? { latitude: userLat, longitude: userLng } : null
+        );
+
+        // Create menu item buttons
+        const keyboard = [];
+        if (details.menu && details.menu.length > 0) {
+          const availableItems = details.menu.filter(item => item.available !== false).slice(0, 5);
+          availableItems.forEach(item => {
+            keyboard.push([{
+              text: `🛒 Add ${item.name} - ₦${item.price}`,
+              callback_data: `add_to_cart_${item.id}`
+            }]);
+          });
+        }
+        
+        keyboard.push([
+          { text: '🛒 View Cart', callback_data: 'view_cart' },
+          { text: '🔙 Back', callback_data: 'browse_restaurants' }
+        ]);
+        keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, '❌ Restaurant not found.');
+      }
+    } catch (error) {
+      console.error('Error showing restaurant details:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading restaurant details. Please try again.');
+    }
+  }
+
+  async searchRestaurants(chatId, query) {
+    try {
+      if (!query) {
+        await this.bot.sendMessage(chatId,
+          '🔍 *Search Restaurants*\n\n' +
+          'What are you looking for?\n\n' +
+          'Examples:\n' +
+          '• Pizza\n' +
+          '• Jollof rice\n' +
+          '• Chinese food\n' +
+          '• Restaurant name',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      await this.bot.sendMessage(chatId, `🔍 Searching for "${query}"...`);
+      
+      const restaurants = await this.restaurantDiscovery.searchRestaurants(query, null, {
+        sortBy: 'rating',
+        limit: 15
+      });
+
+      if (restaurants && restaurants.length > 0) {
+        const message = InterfaceManager.formatRestaurantList(restaurants);
+        
+        const keyboard = [];
+        restaurants.slice(0, 8).forEach(restaurant => {
+          keyboard.push([{
+            text: `🏪 ${restaurant.name}`,
+            callback_data: `restaurant_details_${restaurant.id}`
+          }]);
+        });
+        keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
+
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId,
+          `😕 No results found for "${query}".\n\n` +
+          `💡 Try:\n` +
+          `• Different keywords\n` +
+          `• Browse by state or cuisine\n` +
+          `• Share your location`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🗺️ Browse by State', callback_data: 'browse_by_state' },
+                { text: '🍴 Browse by Cuisine', callback_data: 'browse_by_cuisine' }
+              ]]
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error searching restaurants:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching. Please try again.');
+    }
+  }
+
+  async addItemToCart(chatId, itemId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      const result = await this.shoppingCart.addItem(user.id, itemId, 1);
+      
+      if (result.success) {
+        await this.bot.sendMessage(chatId,
+          `✅ Added to cart!\n\n` +
+          `${result.item.name} - ₦${result.item.price}\n\n` +
+          `🛒 Cart: ${result.cart.items.length} item(s)`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '➕ Add Another', callback_data: `add_to_cart_${itemId}` },
+                { text: '🛒 View Cart', callback_data: 'view_cart' }
+              ], [
+                { text: '🍽️ Continue Shopping', callback_data: `restaurant_details_${result.item.restaurant_id}` }
+              ]]
+            }
+          }
+        );
+      } else {
+        await this.bot.sendMessage(chatId, `❌ ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      await this.bot.sendMessage(chatId, '❌ Error adding item to cart. Please try again.');
+    }
+  }
+
+  async showCart(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      const cart = await this.shoppingCart.getCartSummary(user.id);
+      const formatted = InterfaceManager.formatShoppingCart(cart);
+
+      if (formatted.hasItems) {
+        const keyboard = InterfaceManager.getCartItemsKeyboard(cart.items);
+        
+        await this.bot.sendMessage(chatId, formatted.message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      } else {
+        await this.bot.sendMessage(chatId, formatted.message, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🍽️ Browse Restaurants', callback_data: 'browse_restaurants' },
+              { text: '🏠 Main Menu', callback_data: 'menu_main' }
+            ]]
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error showing cart:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading cart. Please try again.');
+    }
+  }
+
+  async updateCartQuantity(chatId, itemIndex, change) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      const cart = await this.shoppingCart.getCart(user.id);
+      if (!cart || !cart.items[itemIndex]) {
+        await this.bot.sendMessage(chatId, '❌ Item not found in cart.');
+        return;
+      }
+
+      const newQuantity = cart.items[itemIndex].quantity + change;
+      
+      if (newQuantity <= 0) {
+        await this.removeFromCart(chatId, itemIndex);
+      } else {
+        const result = await this.shoppingCart.updateItemQuantity(user.id, itemIndex, newQuantity);
+        
+        if (result.success) {
+          await this.showCart(chatId);
+        } else {
+          await this.bot.sendMessage(chatId, `❌ ${result.message}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating cart quantity:', error);
+      await this.bot.sendMessage(chatId, '❌ Error updating quantity. Please try again.');
+    }
+  }
+
+  async removeFromCart(chatId, itemIndex) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      const result = await this.shoppingCart.removeItem(user.id, itemIndex);
+      
+      if (result.success) {
+        await this.bot.sendMessage(chatId, `✅ Item removed from cart.`);
+        await this.showCart(chatId);
+      } else {
+        await this.bot.sendMessage(chatId, `❌ ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      await this.bot.sendMessage(chatId, '❌ Error removing item. Please try again.');
+    }
+  }
+
+  async clearCart(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      this.shoppingCart.clearCart(user.id);
+      
+      await this.bot.sendMessage(chatId,
+        '🗑️ *Cart Cleared*\n\n' +
+        'Your cart has been emptied.',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🍽️ Browse Restaurants', callback_data: 'browse_restaurants' },
+              { text: '🏠 Main Menu', callback_data: 'menu_main' }
+            ]]
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      await this.bot.sendMessage(chatId, '❌ Error clearing cart. Please try again.');
+    }
+  }
+
+  async checkoutCart(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      // Validate cart
+      const validation = await this.shoppingCart.validateCart(user.id);
+      
+      if (!validation.valid) {
+        let message = '⚠️ *Cannot Checkout*\n\n';
+        validation.errors.forEach(error => {
+          message += `• ${error}\n`;
+        });
+        
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🛒 View Cart', callback_data: 'view_cart' },
+              { text: '🍽️ Continue Shopping', callback_data: 'browse_restaurants' }
+            ]]
+          }
+        });
+        return;
+      }
+
+      // Get cart for order creation
+      const cart = await this.shoppingCart.getCart(user.id);
+      
+      // Request delivery address
+      await this.bot.sendMessage(chatId,
+        '📍 *Delivery Address*\n\n' +
+        'Please share your delivery location:\n\n' +
+        '💡 _Tap the button below to share your location_',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            keyboard: [[{ text: '📍 Share Delivery Location', request_location: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        }
+      );
+      
+      // Store cart for checkout
+      await this.conversationManager.setUserData(chatId, 'checkout_cart', cart);
+      await this.conversationManager.setUserData(chatId, 'awaiting_delivery_location', true);
+      
+    } catch (error) {
+      console.error('Error checking out cart:', error);
+      await this.bot.sendMessage(chatId, '❌ Error processing checkout. Please try again.');
+    }
+  }
+
+  async trackOrder(chatId, orderId) {
+    try {
+      const tracking = await this.deliveryTracking.trackOrder(orderId);
+      
+      if (tracking) {
+        const message = InterfaceManager.formatOrderTracking(tracking);
+        
+        const keyboard = [[
+          { text: '🔄 Refresh', callback_data: `track_order_${orderId}` }
+        ]];
+        
+        if (tracking.status !== 'delivered' && tracking.status !== 'cancelled') {
+          keyboard.push([{ text: '📞 Contact Support', callback_data: 'contact_support' }]);
+        }
+        
+        keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
+        
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId, '❌ Order not found. Please check the order ID.');
+      }
+    } catch (error) {
+      console.error('Error tracking order:', error);
+      await this.bot.sendMessage(chatId, '❌ Error tracking order. Please try again.');
+    }
+  }
+
+  async showActiveOrders(chatId) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      
+      const orders = await this.deliveryTracking.getCustomerActiveOrders(user.id);
+      
+      if (orders && orders.length > 0) {
+        let message = `📦 *Your Active Orders*\n\n`;
+        message += `You have ${orders.length} active order(s):\n\n`;
+        message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        orders.forEach((order, index) => {
+          const statusEmojis = {
+            pending: '⏳',
+            confirmed: '✅',
+            preparing: '👨‍🍳',
+            ready: '📦',
+            picked_up: '🏍️',
+            nearby: '📍',
+            delivered: '🎉'
+          };
+          
+          const emoji = statusEmojis[order.status] || '📋';
+          message += `${index + 1}. ${emoji} *Order #${order.order_number || order.id}*\n`;
+          message += `   Restaurant: ${order.restaurant_name}\n`;
+          message += `   Status: ${order.status}\n`;
+          message += `   Total: ₦${order.total_amount}\n\n`;
+        });
+        
+        message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+        message += `💡 _Tap an order to track it_`;
+        
+        const keyboard = [];
+        orders.forEach(order => {
+          keyboard.push([{
+            text: `Track Order #${order.order_number || order.id}`,
+            callback_data: `track_order_${order.id}`
+          }]);
+        });
+        keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
+        
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } else {
+        await this.bot.sendMessage(chatId,
+          '📦 *No Active Orders*\n\n' +
+          'You don\'t have any active orders.\n\n' +
+          '💡 _Browse restaurants to place an order!_',
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🍽️ Browse Restaurants', callback_data: 'browse_restaurants' },
+                { text: '🏠 Main Menu', callback_data: 'menu_main' }
+              ]]
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error showing active orders:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading orders. Please try again.');
+    }
+  }
+
+  async showCartItemDetails(chatId, itemIndex) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      const cart = await this.shoppingCart.getCart(user.id);
+      
+      if (!cart || !cart.items[itemIndex]) {
+        await this.bot.sendMessage(chatId, '❌ Item not found.');
+        return;
+      }
+
+      const item = cart.items[itemIndex];
+      let message = `🍽️ *${item.name}*\n\n`;
+      message += `💰 Price: ₦${item.price}\n`;
+      message += `🔢 Quantity: ${item.quantity}\n`;
+      message += `💵 Subtotal: ₦${item.price * item.quantity}\n\n`;
+      
+      if (item.customizations && Object.keys(item.customizations).length > 0) {
+        message += `📝 *Customizations:*\n`;
+        Object.entries(item.customizations).forEach(([key, value]) => {
+          message += `• ${key}: ${value}\n`;
+        });
+      }
+      
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '➖', callback_data: `cart_decrease_${itemIndex}` },
+            { text: `${item.quantity}`, callback_data: `cart_view_${itemIndex}` },
+            { text: '➕', callback_data: `cart_increase_${itemIndex}` }
+          ], [
+            { text: '🗑️ Remove', callback_data: `cart_remove_${itemIndex}` },
+            { text: '🛒 Back to Cart', callback_data: 'view_cart' }
+          ]]
+        }
+      });
+    } catch (error) {
+      console.error('Error showing item details:', error);
+      await this.bot.sendMessage(chatId, '❌ Error loading item details.');
+    }
   }
 
   async showStudyHubMenu(chatId) {
@@ -5794,82 +6706,21 @@ Send documents, ask questions, or use commands to get started!
   }
 
   async showHelpMenu(chatId) {
-    let message = `🔧 *MidDexBot Commands*\n\n`;
-    message += `💎 *Career Commands*\n`;
-    message += `/analyze - Analyze uploaded documents\n`;
-    message += `/improve - Enhance CV/Resume\n`;
-    message += `/cover - Generate cover letter\n`;
-    message += `/score - Get ATS compatibility score\n\n`;
-    message += `💰 *Crypto Commands*\n`;
-    message += `/crypto [coin] - Get crypto prices & info\n`;
-    message += `/cryptonews - Latest crypto news\n`;
-    message += `/cryptoalert - Set price alerts\n`;
-    message += `/watchlist - Manage crypto watchlist\n`;
-    message += `/inventory - View portfolio & positions\n`;
-    message += `/buy [coin] - Add buy transaction\n`;
-    message += `/sell [coin] - Add sell transaction\n\n`;
-    message += `🧠 *Study Commands*\n`;
-    message += `/research [topic] - Instant research assistant\n`;
-    message += `/notes [content] - Create smart notes\n`;
-    message += `/homework [problem] - Get homework help\n`;
-    message += `/study - Create personalized study plan\n`;
-    message += `/timer [minutes] - Start study timer\n\n`;
-    message += `👥 *Study Group Commands*\n`;
-    message += `/studygroup - Study group dashboard\n`;
-    message += `/creategroup - Create new study group\n`;
-    message += `/joingroup [code] - Join study group by code\n`;
-    message += `/findgroups [topic] - Find matching groups\n`;
-    message += `/mygroups - View your study groups\n\n`;
-    message += `📚 *Homework Helper Commands*\n`;
-    message += `/homework [question] - Submit homework question\n`;
-    message += `/askhw [question] - Ask homework question\n`;
-    message += `/hwhelp - Homework helper guide\n`;
-    message += `/myhomework - View homework history\n\n`;
-    message += `📅 *Event & Deadline Commands*\n`;
-    message += `/addevent [title] - Add new event or exam\n`;
-    message += `/events - View your upcoming events\n`;
-    message += `/countdown - Show event countdowns\n`;
-    message += `/reminders - Manage reminder settings\n\n`;
-    message += `🎓 *Skill Development Commands*\n`;
-    message += `/courses - Browse free online courses\n`;
-    message += `/webinars - Find educational webinars\n`;
-    message += `/skills [topic] - Search skills & training\n`;
-    message += `/mycourses - Your learning dashboard\n\n`;
-    message += `🍽️ *Food Ordering Commands*\n`;
-    message += `/food - Food ordering hub & dashboard\n`;
-    message += `/restaurants - View nearby restaurants\n`;
-    message += `/orders - View your order history\n`;
-    message += `/order_food or /orderfood - Start ordering food\n`;
-    message += `/register_restaurant or /registerrestaurant - Register your restaurant\n`;
-    message += `/manage_restaurant or /managerestaurant - Manage your restaurant\n`;
-    message += `/my_orders or /myorders - View your food orders\n\n`;
-    message += `🏪 *Business Marketplace Commands* 🆕\n`;
-    message += `/register_business - Register your business\n`;
-    message += `/search [keyword] - Search for businesses\n`;
-    message += `/order [business_id] - Order from a business\n`;
-    message += `/review [order_id] - Review your order\n`;
-    message += `/my_orders - View marketplace orders\n`;
-    message += `/my_business - Manage your businesses\n\n`;
-    message += `🔧 *System Commands*\n`;
-    message += `/debug - View system status and diagnostics\n`;
-    message += `/menu - Show main menu\n`;
-    message += `/help - Show this help message\n\n`;
-    message += `📎 *File Support*\n`;
-    message += `• PDF documents, Images, Text files\n`;
-    message += `• CV/Resume analysis and improvement\n`;
-    message += `• Document text extraction and analysis\n\n`;
-    message += `🎯 *Features*\n`;
-    message += `• AI-powered research and explanations\n`;
-    message += `• Professional document generation\n`;
-    message += `• Study planning and time management\n`;
-    message += `• Homework assistance with step-by-step solutions\n\n`;
-    message += `Just upload files, send text, or use commands!`;
+    const message = InterfaceManager.getHelpMenu();
 
     const keyboard = {
       inline_keyboard: [
         [
           { text: '🏠 Main Menu', callback_data: 'main_menu' },
-          { text: '🔧 System Status', callback_data: 'debug_info' }
+          { text: '📚 Study Hub', callback_data: 'menu_study' }
+        ],
+        [
+          { text: '🛍️ Marketplace', callback_data: 'menu_marketplace' },
+          { text: '�️ Restaurants', callback_data: 'menu_restaurants' }
+        ],
+        [
+          { text: '� Hotels', callback_data: 'menu_hotels' },
+          { text: '� Crypto', callback_data: 'menu_crypto' }
         ]
       ]
     };
@@ -6666,7 +7517,7 @@ Send documents, ask questions, or use commands to get started!
         message += `📍 ${distance}\n`;
         message += `⭐ Rating: ${restaurant.rating || 'New'}\n`;
         if (restaurant.delivery_fee) {
-          message += `🚚 Delivery: $${restaurant.delivery_fee}\n`;
+          message += `🚚 Delivery: ₦${restaurant.delivery_fee}\n`;
         }
         message += `\n`;
       });
@@ -6845,7 +7696,7 @@ Send documents, ask questions, or use commands to get started!
         
         message += `${status} *${restaurant.name}*\n`;
         message += `🍽️ ${restaurant.cuisine_type} • ⭐ ${restaurant.rating}/5\n`;
-        message += `📍 ${distance.toFixed(1)} km • 🚚 $${restaurant.delivery_fee}\n`;
+        message += `📍 ${distance.toFixed(1)} km • 🚚 ₦${restaurant.delivery_fee}\n`;
         message += `⏱️ ${restaurant.average_preparation_time} min\n\n`;
 
         keyboard.inline_keyboard.push([
@@ -6880,7 +7731,7 @@ Send documents, ask questions, or use commands to get started!
       let message = `🍽️ *${restaurant.name}*\n\n`;
       message += `${restaurant.isOpen() ? '🟢 Open' : '🔴 Closed'} • ⭐ ${restaurant.rating}/5\n`;
       message += `🍽️ ${restaurant.cuisine_type}\n`;
-      message += `🚚 Delivery: $${restaurant.delivery_fee} • Min: $${restaurant.minimum_order_amount}\n`;
+      message += `🚚 Delivery: ₦${restaurant.delivery_fee} • Min: ₦${restaurant.minimum_order_amount}\n`;
       message += `⏱️ Prep time: ${restaurant.average_preparation_time} min\n\n`;
 
       const menuItems = restaurant.menuItems || [];
@@ -7059,7 +7910,7 @@ Send documents, ask questions, or use commands to get started!
         const status = restaurant.isOpen() ? '🟢' : '🔴';
         message += `${status} *${restaurant.name}*\n`;
         message += `🍽️ ${restaurant.cuisine_type} • ⭐ ${restaurant.rating}/5\n`;
-        message += `🚚 $${restaurant.delivery_fee} • Min: $${restaurant.minimum_order_amount}\n`;
+        message += `🚚 ₦${restaurant.delivery_fee} • Min: ₦${restaurant.minimum_order_amount}\n`;
         message += `⏱️ ${restaurant.average_preparation_time} min\n\n`;
 
         keyboard.inline_keyboard.push([
@@ -7255,8 +8106,8 @@ Send documents, ask questions, or use commands to get started!
       message += `📍 Address: ${restaurant.address}\n`;
       message += `📞 Phone: ${restaurant.phone}\n`;
       message += `🍽️ Cuisine: ${restaurant.cuisine_type}\n`;
-      message += `🚚 Delivery Fee: $${restaurant.delivery_fee}\n`;
-      message += `💰 Min Order: $${restaurant.minimum_order_amount}\n`;
+      message += `🚚 Delivery Fee: ₦${restaurant.delivery_fee}\n`;
+      message += `💰 Min Order: ₦${restaurant.minimum_order_amount}\n`;
       message += `📏 Delivery Radius: ${restaurant.delivery_radius} km\n`;
       message += `⏱️ Prep Time: ${restaurant.average_preparation_time} min\n`;
 
@@ -8027,59 +8878,142 @@ Send documents, ask questions, or use commands to get started!
     try {
       await this.bot.sendMessage(chatId, '🔍 Finding restaurants near you...');
       
-      // Get city name from coordinates using reverse geocoding
-      let cityName = 'your location';
-      try {
-        const geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
-        const response = await axios.get(geocodeUrl, {
-          headers: {
-            'User-Agent': 'TelegramBot/1.0'
-          }
-        });
-        
-        if (response.data && response.data.address) {
-          cityName = response.data.address.city || 
-                    response.data.address.town || 
-                    response.data.address.village || 
-                    response.data.address.county || 
-                    'your location';
-        }
-      } catch (geoError) {
-        console.error('Geocoding error:', geoError);
-      }
-
-      // Get nearby restaurants
-      const restaurants = await FoodOrderService.getNearbyRestaurants(latitude, longitude);
+      // Store location for checkout
+      await this.conversationManager.setUserData(chatId, 'last_location', {
+        latitude,
+        longitude
+      });
       
-      if (restaurants.length === 0) {
+      // Check if user is checking out
+      const isCheckingOut = await this.conversationManager.getUserData(chatId, 'awaiting_delivery_location');
+      
+      if (isCheckingOut) {
+        // Complete checkout with location
+        await this.completeCheckout(chatId, latitude, longitude);
+        return;
+      }
+      
+      // Get nearby restaurants using new discovery service
+      const restaurants = await this.restaurantDiscovery.findNearbyRestaurants(
+        latitude,
+        longitude,
+        {
+          radius: 20, // 20km radius
+          isOpen: false,
+          sortBy: 'distance',
+          limit: 20
+        }
+      );
+      
+      if (!restaurants || restaurants.length === 0) {
         await this.bot.sendMessage(chatId, 
-          '😕 No restaurants found within 50km of your location.\n\n' +
+          '😕 No restaurants found within 20km.\n\n' +
           'Try:\n' +
-          '• Expanding your search area\n' +
-          '• Searching by city name: `/search_restaurants Lagos`\n' +
-          '• Browsing all restaurants: /restaurants',
-          { parse_mode: 'Markdown' }
+          '• Browse by state\n' +
+          '• Browse by cuisine\n' +
+          '• Search by name',
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🗺️ Browse by State', callback_data: 'browse_by_state' },
+                { text: '🍴 Browse by Cuisine', callback_data: 'browse_by_cuisine' }
+              ]]
+            }
+          }
         );
         return;
       }
 
-      // Calculate distances and sort by proximity
-      const restaurantsWithDistance = restaurants.map(restaurant => {
-        const distance = this.calculateDistance(
-          latitude, 
-          longitude, 
-          restaurant.latitude, 
-          restaurant.longitude
-        );
-        return { ...restaurant.toJSON(), distance };
-      }).sort((a, b) => a.distance - b.distance);
+      // Display restaurants using InterfaceManager
+      const message = InterfaceManager.formatRestaurantList(restaurants, { latitude, longitude });
+      
+      const keyboard = [];
+      restaurants.slice(0, 10).forEach(restaurant => {
+        keyboard.push([{
+          text: `🏪 ${restaurant.name} (${restaurant.distance.toFixed(1)}km)`,
+          callback_data: `restaurant_details_${restaurant.id}`
+        }]);
+      });
+      keyboard.push([{ text: '🏠 Main Menu', callback_data: 'menu_main' }]);
 
-      await this.displayRestaurantResults(chatId, restaurantsWithDistance, cityName, true);
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+      
     } catch (error) {
       console.error('Error searching restaurants by location:', error);
       await this.bot.sendMessage(chatId, 
         '❌ Error finding nearby restaurants. Please try again.'
       );
+    }
+  }
+
+  async completeCheckout(chatId, latitude, longitude) {
+    try {
+      const user = await this.databaseService.getUserByTelegramId(chatId);
+      const cart = await this.conversationManager.getUserData(chatId, 'checkout_cart');
+      
+      if (!cart || !cart.items || cart.items.length === 0) {
+        await this.bot.sendMessage(chatId, '❌ Cart is empty. Please add items first.');
+        return;
+      }
+
+      // Create order using FoodOrderService
+      const orderData = {
+        user_id: user.id,
+        restaurant_id: cart.restaurant_id,
+        items: cart.items,
+        subtotal: cart.subtotal,
+        tax: cart.tax,
+        delivery_fee: cart.delivery_fee,
+        total_amount: cart.total,
+        delivery_address: `${latitude}, ${longitude}`,
+        delivery_latitude: latitude,
+        delivery_longitude: longitude,
+        status: 'pending',
+        payment_method: 'cash', // Default for now
+        payment_status: 'pending'
+      };
+
+      const order = await FoodOrderService.createOrder(orderData);
+      
+      if (order) {
+        // Clear cart
+        this.shoppingCart.clearCart(user.id);
+        await this.conversationManager.setUserData(chatId, 'checkout_cart', null);
+        await this.conversationManager.setUserData(chatId, 'awaiting_delivery_location', false);
+        
+        // Send confirmation
+        await this.bot.sendMessage(chatId,
+          `🎉 *Order Placed Successfully!*\n\n` +
+          `Order #${order.id}\n` +
+          `Restaurant: ${cart.restaurant_name}\n` +
+          `Total: ₦${cart.total.toFixed(2)}\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `✅ Order confirmed\n` +
+          `🚚 Estimated delivery: 30-45 minutes\n\n` +
+          `💡 _Track your order with /track ${order.id}_`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '📦 Track Order', callback_data: `track_order_${order.id}` }
+              ], [
+                { text: '🍽️ Order Again', callback_data: 'browse_restaurants' },
+                { text: '🏠 Main Menu', callback_data: 'menu_main' }
+              ]]
+            }
+          }
+        );
+      } else {
+        await this.bot.sendMessage(chatId, '❌ Error creating order. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('Error completing checkout:', error);
+      await this.bot.sendMessage(chatId, '❌ Error processing order. Please try again.');
     }
   }
 
@@ -8142,6 +9076,164 @@ Send documents, ask questions, or use commands to get started!
     } catch (error) {
       console.error('Error displaying restaurant results:', error);
       await this.bot.sendMessage(chatId, '❌ Error displaying results. Please try again.');
+    }
+  }
+
+  // ===== NIGERIAN CUISINE & CITY SHORTCUTS =====
+
+  async showNigerianCuisineCategories(chatId) {
+    const message = `🇳🇬 *Nigerian Cuisine Categories*\n\nChoose your favorite Nigerian food:\n\n`;
+    
+    const categories = [
+      { name: '🍚 Jollof & Rice', value: 'jollof', desc: 'Jollof rice, fried rice, coconut rice' },
+      { name: '🥘 Swallow & Soup', value: 'swallow', desc: 'Eba, fufu, pounded yam with soups' },
+      { name: '🍗 Suya & Proteins', value: 'suya', desc: 'Suya, peppered chicken, grilled fish' },
+      { name: '🌮 Small Chops', value: 'smallchops', desc: 'Puff puff, samosa, spring rolls' },
+      { name: '☕ Nigerian Breakfast', value: 'breakfast', desc: 'Akara, moi moi, yam & egg' },
+      { name: '🍲 Soups & Stews', value: 'soups', desc: 'Egusi, ogbono, banga, okra' }
+    ];
+
+    const keyboard = [];
+    for (let i = 0; i < categories.length; i += 2) {
+      const row = [
+        { text: categories[i].name, callback_data: `nigerian_${categories[i].value}` }
+      ];
+      if (i + 1 < categories.length) {
+        row.push({ text: categories[i + 1].name, callback_data: `nigerian_${categories[i + 1].value}` });
+      }
+      keyboard.push(row);
+    }
+
+    keyboard.push([
+      { text: '🔙 Back to Food Delivery', callback_data: 'food_delivery' },
+      { text: '🏠 Main Menu', callback_data: 'main_menu' }
+    ]);
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  }
+
+  async searchRestaurantsByCuisine(chatId, cuisineType) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Searching for ${cuisineType} restaurants...`);
+
+      // Map Nigerian cuisine types to search terms
+      const cuisineMap = {
+        'jollof': ['jollof', 'rice', 'fried rice', 'coconut rice'],
+        'swallow': ['swallow', 'eba', 'fufu', 'pounded yam', 'soup'],
+        'suya': ['suya', 'grilled', 'barbecue', 'asun', 'peppered'],
+        'smallchops': ['small chops', 'puff puff', 'samosa', 'spring rolls'],
+        'breakfast': ['breakfast', 'akara', 'moi moi', 'yam'],
+        'soups': ['soup', 'egusi', 'ogbono', 'banga', 'okra', 'afang']
+      };
+
+      const searchTerms = cuisineMap[cuisineType] || [cuisineType];
+      
+      // Get all restaurants and filter by cuisine
+      const allRestaurants = await FoodOrderService.getAllRestaurants();
+      
+      const matchingRestaurants = allRestaurants.filter(restaurant => {
+        const cuisineType = (restaurant.cuisine_type || '').toLowerCase();
+        const description = (restaurant.description || '').toLowerCase();
+        const name = (restaurant.name || '').toLowerCase();
+        
+        return searchTerms.some(term => 
+          cuisineType.includes(term) || 
+          description.includes(term) || 
+          name.includes(term)
+        );
+      });
+
+      if (matchingRestaurants.length === 0) {
+        const cuisineNames = {
+          'jollof': 'Jollof & Rice',
+          'swallow': 'Swallow & Soup',
+          'suya': 'Suya & Proteins',
+          'smallchops': 'Small Chops',
+          'breakfast': 'Nigerian Breakfast',
+          'soups': 'Soups & Stews'
+        };
+
+        await this.bot.sendMessage(chatId,
+          `😕 No restaurants found serving ${cuisineNames[cuisineType] || cuisineType}.\n\n` +
+          `💡 Try:\n` +
+          `• Browse all restaurants: /restaurants\n` +
+          `• Register your restaurant: /registerrestaurant\n` +
+          `• Try another cuisine category`,
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      let message = `🇳🇬 *Nigerian ${cuisineType.charAt(0).toUpperCase() + cuisineType.slice(1)} Restaurants*\n\n`;
+      message += `Found ${matchingRestaurants.length} restaurant${matchingRestaurants.length > 1 ? 's' : ''}:\n\n`;
+
+      const keyboard = [];
+      const displayCount = Math.min(matchingRestaurants.length, 8);
+
+      for (let i = 0; i < displayCount; i++) {
+        const restaurant = matchingRestaurants[i];
+        const rating = restaurant.rating || 0;
+        const ratingStars = '⭐'.repeat(Math.round(rating));
+        
+        message += `🍽️ *${restaurant.name}*\n`;
+        message += `${ratingStars} ${rating.toFixed(1)} | ₦${restaurant.delivery_fee || 0} delivery\n`;
+        message += `📍 ${restaurant.address || 'Location not provided'}\n\n`;
+
+        if (i % 2 === 0) {
+          keyboard.push([]);
+        }
+        keyboard[keyboard.length - 1].push({
+          text: `🍽️ ${restaurant.name}`,
+          callback_data: `restaurant_menu_${restaurant.id}`
+        });
+      }
+
+      if (matchingRestaurants.length > displayCount) {
+        message += `\n_...and ${matchingRestaurants.length - displayCount} more restaurants_\n`;
+      }
+
+      keyboard.push([
+        { text: '🔙 Back to Categories', callback_data: 'nigerian_cuisines' },
+        { text: '🏠 Main Menu', callback_data: 'main_menu' }
+      ]);
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+
+    } catch (error) {
+      console.error('Error searching restaurants by cuisine:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching restaurants. Please try again.');
+    }
+  }
+
+  async searchRestaurantsByCity(chatId, cityName) {
+    try {
+      await this.bot.sendMessage(chatId, `🔍 Searching for restaurants in ${cityName}...`);
+      
+      const restaurants = await FoodOrderService.getRestaurantsByLocation(cityName);
+      
+      if (restaurants.length === 0) {
+        await this.bot.sendMessage(chatId,
+          `😕 No restaurants found in *${cityName}*.\n\n` +
+          `💡 Try:\n` +
+          `• /food_lagos - Search in Lagos\n` +
+          `• /food_abuja - Search in Abuja\n` +
+          `• /food_portharcourt - Search in Port Harcourt\n` +
+          `• /restaurants - Browse all restaurants`,
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      await this.displayRestaurantResults(chatId, restaurants, cityName);
+    } catch (error) {
+      console.error('Error searching restaurants by city:', error);
+      await this.bot.sendMessage(chatId, '❌ Error searching restaurants. Please try again.');
     }
   }
 
