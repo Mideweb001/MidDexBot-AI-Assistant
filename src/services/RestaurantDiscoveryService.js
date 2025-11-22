@@ -63,9 +63,30 @@ class RestaurantDiscoveryService {
         is_verified: true
       };
 
-      // Filter by state (check address field)
+      // Filter by state (check tags JSON array for state name)
+      // Tags format: [city, state, cuisine]
       if (state) {
-        whereClause.address = { [Op.like]: `%${state}%` };
+        // Use JSON search - works for both SQLite and PostgreSQL
+        const sequelize = Restaurant.sequelize;
+        const dialect = sequelize.getDialect();
+        
+        if (dialect === 'postgres') {
+          // PostgreSQL JSON contains operator
+          whereClause[Op.or] = [
+            sequelize.where(
+              sequelize.cast(sequelize.col('tags'), 'text'),
+              { [Op.like]: `%${state}%` }
+            )
+          ];
+        } else {
+          // SQLite - search in JSON as text
+          whereClause[Op.or] = [
+            sequelize.where(
+              sequelize.fn('json_extract', sequelize.col('tags'), '$'),
+              { [Op.like]: `%${state}%` }
+            )
+          ];
+        }
       }
 
       // Filter by cuisine
