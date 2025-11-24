@@ -292,19 +292,6 @@ class InterfaceManager {
         ],
         [buttons.home]
       ];
-    } else if (section === 'food') {
-      // Legacy support - redirect to restaurants
-      keyboard.inline_keyboard = [
-        [
-          { text: '🔍 Search Restaurants', callback_data: 'search_restaurants' },
-          { text: '🍕 Browse All', callback_data: 'browse_restaurants' }
-        ],
-        [
-          { text: '📦 My Orders', callback_data: 'my_food_orders' },
-          { text: '🏪 Register', callback_data: 'register_restaurant' }
-        ],
-        [buttons.home]
-      ];
     } else if (section === 'study') {
       keyboard.inline_keyboard = [
         [
